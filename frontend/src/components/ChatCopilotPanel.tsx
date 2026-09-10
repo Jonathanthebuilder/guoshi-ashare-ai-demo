@@ -37,9 +37,9 @@ interface StreamEvent {
 }
 
 const PRESET_PROMPTS = [
-    '分析一下贵州茅台(600519.SH)今天走势',
-    '请分析稀土ETF嘉实(516150)在2026-03-03的情况',
-    '分析宁德时代300750.SZ，给出交易建议',
+    '调研贵州茅台(600519)短线',
+    '分析宁德时代(300750)中线',
+    '调研稀土ETF嘉实(516150)短线',
 ]
 
 const REPORT_SECTION_TITLES: Record<string, string> = {
@@ -807,7 +807,7 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
 
             <div className="text-xs text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
-                示例：分析贵州茅台 600519.SH 今天走势
+                课堂快速演示 · 点击下方示例填入输入框
             </div>
 
             {/* 快速提示 */}

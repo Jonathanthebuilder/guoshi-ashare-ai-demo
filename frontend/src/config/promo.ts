@@ -9,7 +9,7 @@
 // 不想推广时把 enabled 改为 false，以上所有推广位都会自动隐藏。
 // ─────────────────────────────────────────────────────────────
 export const RELAY_PROMO = {
-    enabled: true,
+    enabled: false,  // classroom demo: hide affiliate promo by default
     name: 'wind',                 // 对外显示名（只显示 wind，不暴露完整域名，避免绕过邀请链接）
     url: 'https://windapi.ai/sign-up?aff=eMfU',  // 官网 / 注册链接，邀请码已带在链接里
     apiBaseUrl: 'https://windapi.ai/v1',  // API Base URL，选中厂商预设后自动填入（注意：这不是注册链接）

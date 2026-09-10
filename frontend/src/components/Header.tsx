@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, BellOff, ChevronDown, LogOut, Monitor, Moon, Settings, Sun, Heart, Megaphone, Users } from 'lucide-react'
+import { Bell, BellOff, ChevronDown, LogOut, Monitor, Moon, Settings, Sun, Megaphone, Users } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
@@ -119,11 +119,14 @@ export default function Header() {
                 <div className="flex items-center gap-3">
                     <div className="hidden md:flex items-center gap-4">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_16px_rgba(16,185,129,0.4)]" />
-                            <div className="text-sm font-semibold tracking-[0.04em] text-slate-900 dark:text-slate-100">A 股投研终端</div>
+                            <div className="w-2.5 h-2.5 rounded-full bg-cyan-600/90 shadow-[0_0_14px_rgba(8,145,178,0.35)]" />
+                            <div>
+                                <div className="text-sm font-semibold tracking-[0.02em] text-slate-900 dark:text-slate-100">嘉实财富 · AI 投研课堂 Demo</div>
+                                <div className="text-[11px] tracking-[0.12em] text-slate-400 dark:text-slate-500">教学研究 · 非投资建议</div>
+                            </div>
                         </div>
                         <div className="h-4 w-px bg-slate-200 dark:bg-slate-800" />
-                        <div className="text-xs tracking-[0.18em] text-slate-400 dark:text-slate-500">工作台在线</div>
+                        <div className="text-xs tracking-[0.18em] text-slate-400 dark:text-slate-500">课堂演示</div>
                     </div>
                 </div>
 
@@ -196,14 +199,7 @@ export default function Header() {
                             )}
                         </div>
                     )}
-                    <Link
-                        to="/sponsor"
-                        className="group flex items-center gap-2 rounded-2xl border border-pink-200 dark:border-pink-900 bg-white dark:bg-slate-900 px-3 py-1.5 hover:border-pink-300 dark:hover:border-pink-700 hover:bg-pink-50 dark:hover:bg-pink-950/30 transition-all mr-1"
-                        title="赞助支持"
-                    >
-                        <Heart className="w-4 h-4 text-pink-500 dark:text-pink-400 group-hover:text-pink-600 dark:group-hover:text-pink-300" />
-                        <span className="text-[13px] font-medium text-pink-600 dark:text-pink-400 group-hover:text-pink-700 dark:group-hover:text-pink-300 hidden sm:inline">赞助</span>
-                    </Link>
+                    {/* classroom demo: sponsor entry de-emphasized */}
                     <Link
                         to="/thanks"
                         className="group flex items-center gap-2 rounded-2xl border border-amber-200 dark:border-amber-900 bg-white dark:bg-slate-900 px-3 py-1.5 hover:border-amber-300 dark:hover:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-all mr-1"

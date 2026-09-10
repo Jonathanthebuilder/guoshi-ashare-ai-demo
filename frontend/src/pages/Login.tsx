@@ -88,20 +88,24 @@ export default function Login() {
                     <div className="absolute bottom-10 right-16 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl dark:bg-blue-500/10" />
 
                     <div className="relative">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/85 px-3 py-1.5 text-xs tracking-[0.22em] text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/85 px-3 py-1.5 text-xs tracking-[0.18em] text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
                             <Radar className="h-3.5 w-3.5 text-cyan-500" />
-                            A 股多智能体研究系统
+                            嘉实财富 · AI 投研课堂 Demo
                         </div>
 
-                        <div className="mt-10 max-w-3xl">
-                            <h1 className="text-5xl font-semibold tracking-[-0.04em] text-slate-950 dark:text-white md:text-7xl">
-                                为投研决策
-                                <span className="mt-2 block bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                                    设计的智能工作台
+                        <div className="mt-4 inline-flex max-w-xl items-center rounded-2xl border border-amber-200/80 bg-amber-50/90 px-3.5 py-2 text-xs leading-5 text-amber-900/90 dark:border-amber-900/40 dark:bg-amber-950/50 dark:text-amber-200/90">
+                            仅供教学研究，不构成投资建议；不连接实盘
+                        </div>
+
+                        <div className="mt-8 max-w-3xl">
+                            <h1 className="text-4xl font-semibold tracking-[-0.04em] text-slate-950 dark:text-white md:text-6xl">
+                                用自然语言
+                                <span className="mt-2 block bg-gradient-to-r from-slate-700 via-cyan-700 to-slate-800 bg-clip-text text-transparent dark:from-slate-200 dark:via-cyan-300 dark:to-slate-100">
+                                    体验多智能体投研
                                 </span>
                             </h1>
                             <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 dark:text-slate-300 md:text-lg">
-                                从市场、舆情、新闻、基本面、宏观、主力资金到风控与组合决策，将 14 个 Agent 的协作过程沉淀为可追踪、可复盘、可持续更新的研究链路。
+                                课堂演示：打开系统 → 点击示例「调研茅台短线」→ 观察 14 个 Agent 协作与辩论 → 查看结构化结论（方向、置信度、目标价、止损、风险）。输出仅供教学参考。
                             </p>
                         </div>
 
@@ -255,14 +259,11 @@ export default function Login() {
             </div>
 
             <footer className="mx-auto max-w-7xl pb-4 pt-2 text-center text-xs text-slate-400 dark:text-slate-500">
+                <p className="mb-1 text-amber-700/80 dark:text-amber-300/80">仅供教学研究，不构成投资建议；不连接实盘</p>
                 <p>
-                    &copy; {new Date().getFullYear()} KylinMountain &middot; 仅限非商业用途（PolyForm NC 1.0） &middot;{' '}
+                    &copy; {new Date().getFullYear()} 嘉实财富课堂 Demo · 基于 TradingAgents-AShare &middot; 仅限非商业用途（PolyForm NC 1.0） &middot;{' '}
                     <a href="https://github.com/KylinMountain/TradingAgents-AShare" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300">
-                        GitHub
-                    </a>
-                    {' '}&middot;{' '}
-                    <a href="https://app.510168.xyz" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300">
-                        官网
+                        上游 GitHub
                     </a>
                 </p>
             </footer>
