@@ -1,6 +1,7 @@
 import { CSSProperties, ReactNode, useCallback, useEffect, useState } from 'react'
 import Sidebar from './Sidebar'
 import Header from './Header'
+import BottomNav from './BottomNav'
 
 interface LayoutProps { children: ReactNode }
 
@@ -26,10 +27,11 @@ export default function Layout({ children }: LayoutProps) {
             <Sidebar collapsed={collapsed} onToggleCollapsed={toggleCollapsed} mobileOpen={mobileOpen} onCloseMobile={closeMobile} />
             <div className="workspace-content">
                 <Header mobileOpen={mobileOpen} onToggleMobile={() => setMobileOpen((open) => !open)} />
-                <main id="main-content" className="min-w-0 flex-1 p-4 sm:p-6 lg:p-7">
+                <main id="main-content" className="min-w-0 flex-1 px-3.5 py-4 pb-24 sm:p-6 sm:pb-6 lg:p-7">
                     <div className="mx-auto w-full max-w-[1600px] min-w-0">{children}</div>
                 </main>
             </div>
+            <BottomNav />
         </div>
     )
 }

@@ -62,10 +62,10 @@ export default function DecisionCard({ symbol, name, decision, direction, confid
                 {selfRating != null && <div className="text-right text-xs leading-5 text-[#657582] dark:text-slate-400"><p>模型自评 <span className="tabular-nums font-medium">{selfRating}%</span></p><p className="text-[11px]">未经历史结果校准</p></div>}
             </header>
 
-            <dl className="grid grid-cols-1 gap-4 border-y border-[#DFE5E9] py-4 dark:border-slate-700 min-[460px]:grid-cols-3">
-                <div><dt className="mb-1 text-xs text-[#657582] dark:text-slate-400">研究方向</dt><dd className={`text-base font-semibold ${/看多|偏多/.test(researchDirection) ? 'text-[#AF423F] dark:text-red-300' : /看空|偏空/.test(researchDirection) ? 'text-[#287461] dark:text-emerald-300' : 'text-[#172D40] dark:text-slate-100'}`}>{researchDirection}</dd></div>
-                <div><dt className="mb-1 text-xs text-[#657582] dark:text-slate-400">建议动作</dt><dd className="text-base font-semibold text-[#172D40] dark:text-slate-100">{action || '未形成建议'}</dd></div>
-                <div><dt className="mb-1 text-xs text-[#657582] dark:text-slate-400">风控状态</dt><dd className={`text-sm font-medium ${riskRequiresAttention ? 'text-[#AF423F] dark:text-red-300' : 'text-[#243746] dark:text-slate-200'}`}>{riskStatus}</dd>{riskVerdict && <p className="mt-1 text-[11px] text-[#657582] dark:text-slate-400">模型裁决</p>}</div>
+            <dl className="grid grid-cols-3 gap-2 border-y border-[#DFE5E9] py-3.5 text-center sm:text-left dark:border-slate-700">
+                <div><dt className="mb-1 text-[11px] sm:text-xs text-[#657582] dark:text-slate-400">研究方向</dt><dd className={`text-sm sm:text-base font-bold ${/看多|偏多/.test(researchDirection) ? 'text-[#AF423F] dark:text-red-300' : /看空|偏空/.test(researchDirection) ? 'text-[#287461] dark:text-emerald-300' : 'text-[#172D40] dark:text-slate-100'}`}>{researchDirection}</dd></div>
+                <div><dt className="mb-1 text-[11px] sm:text-xs text-[#657582] dark:text-slate-400">建议动作</dt><dd className="text-sm sm:text-base font-bold text-[#172D40] dark:text-slate-100">{action || '未形成建议'}</dd></div>
+                <div><dt className="mb-1 text-[11px] sm:text-xs text-[#657582] dark:text-slate-400">风控状态</dt><dd className={`text-xs sm:text-sm font-semibold ${riskRequiresAttention ? 'text-[#AF423F] dark:text-red-300' : 'text-[#243746] dark:text-slate-200'}`}>{riskStatus}</dd>{riskVerdict && <p className="mt-0.5 text-[10px] text-[#657582] dark:text-slate-400">模型裁决</p>}</div>
             </dl>
 
             {feedback && (feedback.revision_reason || feedback.hard_constraints?.length > 0 || feedback.execution_preconditions?.length > 0) && (

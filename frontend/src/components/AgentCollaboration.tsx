@@ -391,7 +391,9 @@ interface AgentCollaborationProps {
 
 export default function AgentCollaboration({ onSelectSection, onOpenDebate, selectedSection }: AgentCollaborationProps) {
     const { agents, isAnalyzing, streamingSections, report } = useAnalysisStore()
-    const [viewMode, setViewMode] = useState<'graph' | 'list'>('graph')
+    const [viewMode, setViewMode] = useState<'graph' | 'list'>(() =>
+        typeof window !== 'undefined' && window.innerWidth < 768 ? 'list' : 'graph'
+    )
     const [isFullscreen, setIsFullscreen] = useState(false)
     const flowInstanceRef = useRef<ReactFlowInstance<CollaborationNode, Edge> | null>(null)
 

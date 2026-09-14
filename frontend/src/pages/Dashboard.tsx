@@ -80,18 +80,18 @@ function DashboardContent({ userId }: { userId?: string }) {
                 </button>
             </header>
 
-            <dl className="flex flex-wrap gap-x-8 gap-y-3 border-y border-[#DFE5E9] py-4 text-sm dark:border-[#31424F]">
-                <div className="flex items-baseline gap-3">
-                    <dt className={secondaryText}>跟踪标的</dt>
-                    <dd className="font-semibold tabular-nums">{trackingLoading ? '读取中' : trackedCount != null ? `${trackedCount} 只` : '—'}</dd>
+            <dl className="grid grid-cols-3 gap-2 sm:gap-4 border-y border-[#DFE5E9] py-3 text-sm dark:border-[#31424F]">
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/40 p-2.5 sm:p-3 text-center sm:text-left">
+                    <dt className={`text-[11px] sm:text-xs ${secondaryText}`}>跟踪标的</dt>
+                    <dd className="mt-0.5 text-base sm:text-lg font-bold tabular-nums">{trackingLoading ? '读取中' : trackedCount != null ? `${trackedCount} 只` : '—'}</dd>
                 </div>
-                <div className="flex items-baseline gap-3">
-                    <dt className={secondaryText}>研究记录</dt>
-                    <dd className="font-semibold tabular-nums">{reportsLoading ? '读取中' : reportTotal != null ? `${reportTotal} 份` : '—'}</dd>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/40 p-2.5 sm:p-3 text-center sm:text-left">
+                    <dt className={`text-[11px] sm:text-xs ${secondaryText}`}>研究记录</dt>
+                    <dd className="mt-0.5 text-base sm:text-lg font-bold tabular-nums">{reportsLoading ? '读取中' : reportTotal != null ? `${reportTotal} 份` : '—'}</dd>
                 </div>
-                <div className="flex items-baseline gap-3">
-                    <dt className={secondaryText}>当前会话</dt>
-                    <dd>{isAnalyzing ? '研究进行中' : analysisRunState === 'failed' ? '上次研究失败' : '无进行中的研究'}</dd>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/40 p-2.5 sm:p-3 text-center sm:text-left">
+                    <dt className={`text-[11px] sm:text-xs ${secondaryText}`}>当前会话</dt>
+                    <dd className="mt-0.5 text-xs sm:text-sm font-semibold truncate">{isAnalyzing ? '协同推演中' : analysisRunState === 'failed' ? '任务中断' : '待命'}</dd>
                 </div>
             </dl>
 
@@ -121,7 +121,47 @@ function DashboardContent({ userId }: { userId?: string }) {
                         </div>
                     ) : (
                         <>
-                            <div className="overflow-x-auto">
+                            {/* 移动端股票行情行列表 (md:hidden) */}
+                            <div className="md:hidden divide-y divide-[#DFE5E9] border-t border-[#DFE5E9] dark:divide-[#31424F] dark:border-[#31424F]">
+                                {trackingBoard?.items.slice(0, 8).map(item => (
+                                    <div
+                                        key={item.symbol}
+                                        onClick={() => navigate('/tracking-board')}
+                                        className="flex items-center justify-between p-3.5 active:bg-slate-50 dark:active:bg-slate-800/60 cursor-pointer"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                                                {item.name || item.symbol}
+                                            </p>
+                                            <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
+                                                <span className="font-mono">{item.symbol}</span>
+                                                {item.analysis && <span>· {item.analysis.trade_date}</span>}
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="block font-bold text-sm tabular-nums text-slate-900 dark:text-white">
+                                                {formatLivePrice(item.live_price)}
+                                            </span>
+                                            {item.price_change_pct != null && Number.isFinite(item.price_change_pct) ? (
+                                                <span className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[11px] font-semibold tabular-nums ${
+                                                    item.price_change_pct > 0
+                                                        ? 'bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-300'
+                                                        : item.price_change_pct < 0
+                                                        ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300'
+                                                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                                }`}>
+                                                    {formatPriceChange(item.price_change_pct)}
+                                                </span>
+                                            ) : (
+                                                <span className="text-[11px] text-slate-400">行情暂缺</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* 桌面端标准宽表格 (hidden md:block) */}
+                            <div className="hidden md:block overflow-x-auto">
                                 <table className="w-full min-w-[470px] text-left text-sm">
                                     <thead className="border-y border-[#DFE5E9] bg-[#F4F6F8] dark:border-[#31424F] dark:bg-[#111B24]">
                                         <tr>

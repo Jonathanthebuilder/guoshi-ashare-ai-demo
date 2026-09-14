@@ -130,7 +130,7 @@ export default function Analysis() {
                         {hasResearch ? <>
                             <DecisionCard compact onReadReport={() => handleShowReport()} symbol={activeSymbol} report={report || undefined} decision={parseDecisionPresentation(report?.decision).action} direction={report?.direction} confidence={store.jobConfidence ?? extractExplicitConfidence(report?.final_trade_decision)} targetPrice={store.jobTargetPrice ?? extractExplicitPrice(report?.final_trade_decision, 'target')} stopLoss={store.jobStopLoss ?? extractExplicitPrice(report?.final_trade_decision, 'stop')} reasoning={report?.final_trade_decision} />
                             <div className={`grid min-w-0 gap-5 ${assistantOpen ? '2xl:grid-cols-[minmax(0,1fr)_300px]' : 'xl:grid-cols-[minmax(0,1fr)_300px]'}`}>
-                                <div className="h-[380px] min-w-0"><KlinePanel symbol={chartSymbol} onSymbolChange={setChartSymbol} /></div>
+                                <div className="h-[320px] sm:h-[380px] min-w-0"><KlinePanel symbol={chartSymbol} onSymbolChange={setChartSymbol} /></div>
                                 <RiskRadar items={store.riskItems} />
                             </div>
                             <KeyMetrics items={store.keyMetrics} />
@@ -142,7 +142,7 @@ export default function Analysis() {
                                 <p className="mt-3 max-w-xl text-sm leading-7 text-slate-500 dark:text-slate-400">在研究助理中输入股票名称或代码，并说明持有期限、关注问题和风险约束。完成后可在此查看研究判断、关键依据与风险条件。</p>
                                 {!isRunning && <button className="btn-primary mt-5 inline-flex items-center gap-2" onClick={() => setAssistantOpen(true)}>填写研究需求<ArrowRight className="h-4 w-4" /></button>}
                             </div>
-                            <div className="h-[400px] min-w-0"><KlinePanel symbol={chartSymbol} onSymbolChange={setChartSymbol} /></div>
+                            <div className="h-[320px] sm:h-[400px] min-w-0"><KlinePanel symbol={chartSymbol} onSymbolChange={setChartSymbol} /></div>
                         </>}
                     </section>}
                     {activeTab === 'evidence' && <section role="tabpanel" id="panel-evidence" aria-labelledby="tab-evidence" className="space-y-5">
@@ -158,9 +158,9 @@ export default function Analysis() {
                         {isCurrentJob ? <AgentCollaboration onSelectSection={handleShowReport} onOpenDebate={setDebateDrawer} selectedSection={activeSection} /> : <p className="text-sm text-slate-500">该标的尚未启动研究任务。</p>}
                     </section>}
                 </div>
-                {assistantOpen && !isDesktop && <div aria-hidden="true" className="fixed inset-0 z-30 bg-slate-950/30" onClick={() => setAssistantOpen(false)} />}
+                {assistantOpen && !isDesktop && <div aria-hidden="true" className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs" onClick={() => setAssistantOpen(false)} />}
                 {/* Keep the SSE connection owner mounted when its panel closes. */}
-                <aside ref={assistantPanel} id="research-assistant" role={isDesktop ? "complementary" : "dialog"} aria-modal={!isDesktop && assistantOpen ? true : undefined} aria-label="研究助理" hidden={!assistantOpen} className="fixed inset-y-0 right-0 z-40 w-full max-w-[390px] border-l border-slate-200 bg-[var(--canvas)] p-3 shadow-xl xl:sticky xl:top-24 xl:z-auto xl:h-[calc(100dvh-8rem)] xl:w-auto xl:max-w-none xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none dark:border-slate-700">
+                <aside ref={assistantPanel} id="research-assistant" role={isDesktop ? "complementary" : "dialog"} aria-modal={!isDesktop && assistantOpen ? true : undefined} aria-label="研究助理" hidden={!assistantOpen} className="fixed inset-y-0 right-0 z-50 w-full max-w-[390px] border-l border-slate-200 bg-[var(--canvas)] p-3 shadow-xl xl:sticky xl:top-24 xl:z-auto xl:h-[calc(100dvh-8rem)] xl:w-auto xl:max-w-none xl:border-0 xl:bg-transparent xl:p-0 xl:shadow-none dark:border-slate-700">
                     <div className="flex h-full min-h-0 flex-col gap-2">
                         <button type="button" className="flex shrink-0 items-center justify-end gap-1 py-1 text-xs text-slate-500" onClick={() => { setAssistantOpen(false); assistantToggle.current?.focus() }}><PanelRightClose className="h-4 w-4" />收起助理</button>
                         <div className="min-h-0 flex-1"><ChatCopilotPanel onSymbolDetected={symbol => { setSubject({ query: querySymbol, job: symbol, symbol, chart: symbol }); store.setCurrentSymbol(symbol) }} onShowReport={handleShowReport} initialInput={querySymbol ? `分析 ${querySymbol} 今日走势` : undefined} /></div>

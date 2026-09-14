@@ -422,84 +422,11 @@ export default function Reports() {
                 </div>
             )}
 
-            {/* 报告表格 */}
+            {/* 报告呈现：移动端为原生金融卡片流，桌面端为高密度数据表格 */}
             {!loading && !error && (
-                <div className="card overflow-hidden !p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[920px] text-sm">
-                            <thead className="bg-[#F4F6F8] dark:bg-[#111B24]">
-                                <tr className="border-b border-[#DFE5E9] dark:border-[#31424F]">
-                                    {['标的', '研究日期', '研究建议 / 状态', '模型自评', '目标价 / 止损价', '记录创建时间', '操作'].map(h => (
-                                        <th scope="col" key={h} className={`whitespace-nowrap px-4 py-3.5 text-xs font-medium text-[#657582] dark:text-[#A4B2BE] ${['操作', '模型自评', '目标价 / 止损价'].includes(h) ? 'text-right' : 'text-left'}`}>
-                                            {h}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[#DFE5E9] dark:divide-[#31424F]">
-                                {filteredReports.map((report) => {
-                                    return (
-                                        <tr
-                                            key={report.id}
-                                            className="cursor-pointer transition-colors hover:bg-[#F4F6F8] dark:hover:bg-[#1D303E]"
-                                            onClick={() => handleSelectReport(report)}
-                                        >
-                                            <td className="py-3 px-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div>
-                                                        <p className="font-medium text-slate-900 dark:text-slate-100">{report.name || report.symbol}</p>
-                                                        {report.name && report.name !== report.symbol && (
-                                                            <p className="text-xs text-slate-400 dark:text-slate-500">{report.symbol}</p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="whitespace-nowrap px-4 py-4 text-[#657582] tabular-nums dark:text-[#A4B2BE]">{report.trade_date}</td>
-                                            <td className="py-3 px-4">
-                                                {renderStatusBadge(report)}
-                                            </td>
-                                            <td className="px-4 py-4 text-right tabular-nums text-[#657582] dark:text-[#A4B2BE]">
-                                                {report.confidence != null ? `${report.confidence}%` : '—'}
-                                            </td>
-                                            <td className="whitespace-nowrap px-4 py-4 text-right tabular-nums text-[#243746] dark:text-[#E8EDF1]">
-                                                {report.target_price != null ? report.target_price : '—'} / {report.stop_loss_price != null ? report.stop_loss_price : '—'}
-                                            </td>
-                                            <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[#657582] dark:text-[#A4B2BE]">
-                                                {report.created_at ? new Date(report.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
-                                            </td>
-                                            <td className="py-3 px-4">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        className="flex h-11 w-11 items-center justify-center rounded text-[#657582] transition-colors hover:bg-[#DFE5E9] hover:text-[#172D40] dark:text-[#A4B2BE] dark:hover:bg-[#31424F] dark:hover:text-[#E8EDF1]"
-                                                        onClick={e => { e.stopPropagation(); handleSelectReport(report) }}
-                                                        title="查看详情"
-                                                        aria-label={`查看 ${report.name || report.symbol} 的研究报告`}
-                                                    >
-                                                        <FileText className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        className="flex h-11 w-11 items-center justify-center rounded text-[#657582] transition-colors hover:bg-[#FBF2F1] hover:text-[#AF423F] disabled:opacity-50 dark:text-[#A4B2BE] dark:hover:bg-[#372827] dark:hover:text-[#E1A3A0]"
-                                                        onClick={e => handleDelete(e, report.id)}
-                                                        disabled={deleting === report.id}
-                                                        title="删除"
-                                                        aria-label={`删除 ${report.name || report.symbol} 的研究报告`}
-                                                    >
-                                                        {deleting === report.id
-                                                            ? <Loader2 className="w-4 h-4 animate-spin" />
-                                                            : <Trash2 className="w-4 h-4" />
-                                                        }
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {filteredReports.length === 0 && (
-                        <div className="text-center py-12">
+                <div>
+                    {filteredReports.length === 0 ? (
+                        <div className="card text-center py-12">
                             <FileText className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
                             <p className="text-slate-500 dark:text-slate-400">
                                 {searchQuery ? '没有匹配的报告' : '暂无报告'}
@@ -508,13 +435,151 @@ export default function Reports() {
                                 在分析页面生成新的报告
                             </p>
                         </div>
+                    ) : (
+                        <>
+                            {/* 移动端卡片流列表 (md:hidden) */}
+                            <div className="md:hidden space-y-3">
+                                {filteredReports.map((report) => (
+                                    <div
+                                        key={report.id}
+                                        onClick={() => handleSelectReport(report)}
+                                        className="card p-4 transition-all active:scale-[0.98] active:bg-slate-50 dark:active:bg-slate-800/80 cursor-pointer border border-slate-200 dark:border-slate-800 shadow-xs"
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-baseline gap-2">
+                                                    <h3 className="font-bold text-base text-slate-900 dark:text-white truncate">
+                                                        {report.name || report.symbol}
+                                                    </h3>
+                                                    {report.name && report.name !== report.symbol && (
+                                                        <span className="font-mono text-xs text-slate-400">{report.symbol}</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                    研究日期：{report.trade_date}
+                                                </p>
+                                            </div>
+                                            <div className="shrink-0">
+                                                {renderStatusBadge(report)}
+                                            </div>
+                                        </div>
+
+                                        {report.status === 'completed' && (
+                                            <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 p-2.5 text-center text-xs">
+                                                <div>
+                                                    <span className="block text-[10px] text-slate-400">模型自评</span>
+                                                    <span className="font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
+                                                        {report.confidence != null ? `${report.confidence}%` : '—'}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-[10px] text-slate-400">目标价</span>
+                                                    <span className="font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
+                                                        {report.target_price != null ? Number(report.target_price).toFixed(2) : '—'}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-[10px] text-slate-400">止损价</span>
+                                                    <span className="font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
+                                                        {report.stop_loss_price != null ? Number(report.stop_loss_price).toFixed(2) : '—'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                                            <span>{report.created_at ? new Date(report.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                            <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium text-xs">
+                                                查看完整研报 <ChevronRight className="w-3.5 h-3.5" />
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* 桌面端完整数据表格 (hidden md:block) */}
+                            <div className="hidden md:block card overflow-hidden !p-0">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[920px] text-sm">
+                                        <thead className="bg-[#F4F6F8] dark:bg-[#111B24]">
+                                            <tr className="border-b border-[#DFE5E9] dark:border-[#31424F]">
+                                                {['标的', '研究日期', '研究建议 / 状态', '模型自评', '目标价 / 止损价', '记录创建时间', '操作'].map(h => (
+                                                    <th scope="col" key={h} className={`whitespace-nowrap px-4 py-3.5 text-xs font-medium text-[#657582] dark:text-[#A4B2BE] ${['操作', '模型自评', '目标价 / 止损价'].includes(h) ? 'text-right' : 'text-left'}`}>
+                                                        {h}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-[#DFE5E9] dark:divide-[#31424F]">
+                                            {filteredReports.map((report) => {
+                                                return (
+                                                    <tr
+                                                        key={report.id}
+                                                        className="cursor-pointer transition-colors hover:bg-[#F4F6F8] dark:hover:bg-[#1D303E]"
+                                                        onClick={() => handleSelectReport(report)}
+                                                    >
+                                                        <td className="py-3 px-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div>
+                                                                    <p className="font-medium text-slate-900 dark:text-slate-100">{report.name || report.symbol}</p>
+                                                                    {report.name && report.name !== report.symbol && (
+                                                                        <p className="text-xs text-slate-400 dark:text-slate-500">{report.symbol}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-4 py-4 text-[#657582] tabular-nums dark:text-[#A4B2BE]">{report.trade_date}</td>
+                                                        <td className="py-3 px-4">
+                                                            {renderStatusBadge(report)}
+                                                        </td>
+                                                        <td className="px-4 py-4 text-right tabular-nums text-[#657582] dark:text-[#A4B2BE]">
+                                                            {report.confidence != null ? `${report.confidence}%` : '—'}
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-4 py-4 text-right tabular-nums text-[#243746] dark:text-[#E8EDF1]">
+                                                            {report.target_price != null ? report.target_price : '—'} / {report.stop_loss_price != null ? report.stop_loss_price : '—'}
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[#657582] dark:text-[#A4B2BE]">
+                                                            {report.created_at ? new Date(report.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                        </td>
+                                                        <td className="py-3 px-4">
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <button
+                                                                    className="flex h-11 w-11 items-center justify-center rounded text-[#657582] transition-colors hover:bg-[#DFE5E9] hover:text-[#172D40] dark:text-[#A4B2BE] dark:hover:bg-[#31424F] dark:hover:text-[#E8EDF1]"
+                                                                    onClick={e => { e.stopPropagation(); handleSelectReport(report) }}
+                                                                    title="查看详情"
+                                                                    aria-label={`查看 ${report.name || report.symbol} 的研究报告`}
+                                                                >
+                                                                    <FileText className="w-4 h-4" />
+                                                                </button>
+                                                                <button
+                                                                    className="flex h-11 w-11 items-center justify-center rounded text-[#657582] transition-colors hover:bg-[#FBF2F1] hover:text-[#AF423F] disabled:opacity-50 dark:text-[#A4B2BE] dark:hover:bg-[#372827] dark:hover:text-[#E1A3A0]"
+                                                                    onClick={e => handleDelete(e, report.id)}
+                                                                    disabled={deleting === report.id}
+                                                                    title="删除"
+                                                                    aria-label={`删除 ${report.name || report.symbol} 的研究报告`}
+                                                                >
+                                                                    {deleting === report.id
+                                                                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                                                                        : <Trash2 className="w-4 h-4" />
+                                                                    }
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </>
                     )}
 
-                    <p className="border-t border-[#DFE5E9] px-4 py-3 text-xs leading-6 text-[#657582] dark:border-[#31424F] dark:text-[#A4B2BE]">模型自评为原报告输出，并非经过校准的成功概率。目标价、止损价的币种与适用条件请查阅原报告。</p>
+                    <p className="mt-3 px-2 text-xs leading-6 text-[#657582] dark:text-[#A4B2BE]">模型自评为原报告输出，并非经过校准的成功概率。目标价、止损价的币种与适用条件请查阅原报告。</p>
 
                     {/* Pagination */}
                     {totalPages > 1 && (
-                        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center justify-between px-4 py-3 card mt-3">
                             <span className="text-sm text-slate-500 dark:text-slate-400">
                                 第 {page + 1} / {totalPages} 页，共 {total} 条
                             </span>

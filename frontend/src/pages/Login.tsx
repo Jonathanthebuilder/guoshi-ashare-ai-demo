@@ -78,10 +78,11 @@ export default function Login() {
     }
 
     return (
-        <div className="flex min-h-screen flex-col bg-[#F4F6F8] px-5 py-4 text-[#243746] dark:bg-[#111B24] dark:text-[#E8EDF1] sm:px-10 sm:py-10">
-            <div className="mx-auto flex w-full max-w-[1120px] flex-1 items-center py-3 lg:py-10">
-                <main className="grid w-full overflow-hidden rounded-lg border border-[#DFE5E9] bg-white dark:border-[#31424F] dark:bg-[#172530] lg:min-h-[660px] lg:grid-cols-[1fr_1fr]">
-                    <section className="flex flex-col justify-between bg-[#172D40] px-6 py-6 text-white sm:px-10 lg:p-12">
+        <div className="flex min-h-screen flex-col bg-[#F4F6F8] px-3 py-2 text-[#243746] dark:bg-[#111B24] dark:text-[#E8EDF1] sm:px-10 sm:py-10">
+            <div className="mx-auto flex w-full max-w-[1120px] flex-1 items-center py-2 lg:py-10">
+                <main className="grid w-full overflow-hidden rounded-xl border border-[#DFE5E9] bg-white shadow-sm dark:border-[#31424F] dark:bg-[#172530] lg:min-h-[660px] lg:grid-cols-[1fr_1fr]">
+                    {/* 桌面端左侧品牌大图 (移动端隐藏以保证首屏直接操作) */}
+                    <section className="hidden lg:flex flex-col justify-between bg-[#172D40] px-6 py-6 text-white sm:px-10 lg:p-12">
                         <div className="flex items-center gap-4">
                             <span className="h-8 w-0.5 bg-[#92764E]" aria-hidden="true" />
                             <div>
@@ -94,49 +95,59 @@ export default function Login() {
                             <h1 className="text-2xl font-medium leading-[1.6] lg:text-4xl lg:tracking-wide">
                                 从研究依据，<br className="hidden lg:block" />到清晰判断。
                             </h1>
-                            <p className="mt-2 text-sm leading-6 text-[#BECAD4] lg:hidden">围绕标的、依据与风险开展研究。</p>
                             <p className="mt-6 hidden max-w-sm text-sm leading-7 text-[#BECAD4] lg:block">
                                 查阅标的研究、关注关键分歧，<br />在持续跟踪中回看每一次判断。
                             </p>
                         </div>
-                        <div className="hidden border-t border-white/15 pt-6 text-xs leading-6 text-[#BECAD4] lg:block">
+                        <div className="border-t border-white/15 pt-6 text-xs leading-6 text-[#BECAD4]">
                             老 K 自建 · 投研工作台
                         </div>
                     </section>
 
-                    <section className="flex items-center px-6 py-7 sm:px-12 lg:p-12" aria-label="账户登录">
+                    <section className="flex items-center px-4 py-6 sm:px-10 lg:p-12" aria-label="账户登录">
                         <div className="w-full">
-                            <p className="text-xs font-medium tracking-[0.14em] text-[#657582] dark:text-[#A4B2BE]">账户登录</p>
-                            <h2 className="mt-2 text-2xl font-semibold">欢迎使用</h2>
-                            <p className="mt-1.5 text-sm leading-6 text-[#657582] dark:text-[#A4B2BE]">现场扫码体验或使用账号登录工作台。</p>
+                            {/* 移动端专用轻量顶部品牌栏 */}
+                            <div className="lg:hidden flex items-center justify-between pb-4 mb-4 border-b border-[#DFE5E9] dark:border-[#31424F]">
+                                <div className="flex items-center gap-2.5">
+                                    <span className="h-5 w-1 rounded-full bg-[#c0a47c]" />
+                                    <span className="text-base font-bold tracking-wider text-[#172D40] dark:text-white">老 K 投研工作台</span>
+                                </div>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300 font-semibold">
+                                    现场 Demo 专版
+                                </span>
+                            </div>
 
-                            {/* 现场观众 / Demo 试用一键免密通道 */}
-                            <div className="mt-5 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-gradient-to-br from-blue-50/90 via-indigo-50/40 to-slate-50 dark:from-blue-950/40 dark:via-slate-900 dark:to-slate-900 p-4 shadow-xs">
+                            <p className="text-xs font-medium tracking-[0.14em] text-[#657582] dark:text-[#A4B2BE]">账户登录</p>
+                            <h2 className="mt-1 text-xl sm:text-2xl font-semibold">欢迎使用</h2>
+                            <p className="mt-1 text-xs sm:text-sm leading-5 text-[#657582] dark:text-[#A4B2BE]">现场扫码体验或使用账号登录工作台。</p>
+
+                            {/* 现场观众 / Demo 试用一键免密通道 (首屏核心视觉焦点) */}
+                            <div className="mt-4 rounded-xl border-2 border-blue-400/70 dark:border-blue-700/80 bg-gradient-to-br from-blue-50 via-indigo-50/40 to-slate-50 dark:from-blue-950/50 dark:via-slate-900 dark:to-slate-900 p-4 shadow-sm">
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex items-center gap-2.5">
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-500/30">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/30">
                                             <Sparkles className="h-5 w-5" />
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
                                                 现场演示 · 观众免密体验通道
                                                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/80 dark:text-blue-300">
                                                     已锁死 Gemini 算力
                                                 </span>
                                             </h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                                已预置专属 Google Gemini (3.8 Flash) 算力，扫码直接体验，无需任何选择与配置
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                已预置专属 Google Gemini 3.8 算力，扫码直接体验
                                             </p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="mt-4 flex flex-col sm:flex-row gap-2.5">
+                                <div className="mt-3.5 flex flex-col gap-2.5">
                                     <button
                                         type="button"
                                         disabled={demoLoading || loading}
                                         onClick={handleDemoLogin}
-                                        className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 text-sm font-semibold shadow-sm transition-all duration-150 disabled:opacity-50"
+                                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white py-3 px-4 text-sm font-bold shadow-md shadow-blue-600/20 transition-all duration-150 disabled:opacity-50"
                                     >
                                         {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
                                         <span>一键进入 Demo 体验</span>
@@ -147,10 +158,10 @@ export default function Login() {
                                         disabled={masterLoading || loading}
                                         onClick={handleMasterLogin}
                                         title="演示主持人免密直达管理主账号"
-                                        className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 py-2.5 px-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs transition-colors disabled:opacity-50"
+                                        className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 py-2 px-3 text-xs font-medium text-slate-700 dark:text-slate-300 shadow-xs transition-colors disabled:opacity-50"
                                     >
                                         {masterLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />}
-                                        <span>老 K 主持人登录</span>
+                                        <span>老 K 主持人通道登录</span>
                                     </button>
                                 </div>
                             </div>
