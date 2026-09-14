@@ -1,4 +1,4 @@
-import { TrendingUp, Activity, FileText, CheckCircle, ArrowRight } from 'lucide-react'
+import { ArrowRight, FileText, Loader2, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -7,21 +7,33 @@ import { useAnalysisStore } from '@/stores/analysisStore'
 import { useAuthStore } from '@/stores/authStore'
 import type { Report, TrackingBoardResponse } from '@/types'
 import PromoBanner from '@/components/PromoBanner'
+import { parseDecisionPresentation } from '@/utils/decisionPresentation'
+
+const secondaryText = 'text-[#657582] dark:text-[#A4B2BE]'
 
 export default function Dashboard() {
-    const { agents, isAnalyzing } = useAnalysisStore()
     const { user } = useAuthStore()
+    return <DashboardContent key={user?.id ?? 'signed-out'} userId={user?.id} />
+}
+
+function DashboardContent({ userId }: { userId?: string }) {
+    const { agents, isAnalyzing, currentSymbol, analysisRunState, analysisRunError } = useAnalysisStore()
     const [reportTotal, setReportTotal] = useState<number | null>(null)
     const [recentReports, setRecentReports] = useState<Report[]>([])
     const [trackingBoard, setTrackingBoard] = useState<TrackingBoardResponse | null>(null)
-    const [dashboardError, setDashboardError] = useState<string | null>(null)
+    const [reportsLoading, setReportsLoading] = useState(true)
+    const [trackingLoading, setTrackingLoading] = useState(true)
+    const [reportsError, setReportsError] = useState<string | null>(null)
+    const [trackingError, setTrackingError] = useState<string | null>(null)
     const navigate = useNavigate()
 
     const completedAgents = agents.filter(a => a.status === 'completed').length
-    const inProgressAgents = agents.filter(a => a.status === 'in_progress').length
+    const activeAgents = agents.filter(a => a.status === 'in_progress')
+    const trackedCount = trackingBoard?.items.length
+    const quotedCount = trackingBoard?.items.filter(item => item.quote_source).length
 
     useEffect(() => {
-        if (!user?.id) return
+        if (!userId) return
         let cancelled = false
 
         api.getReports(undefined, 0, 5)
@@ -33,9 +45,9 @@ export default function Dashboard() {
             .catch(error => {
                 if (cancelled) return
                 console.error('Failed to load recent reports:', error)
-                setReportTotal(null)
-                setDashboardError(prev => prev || (error instanceof Error ? error.message : '加载控制台数据失败'))
+                setReportsError(error instanceof Error ? error.message : '最近研究暂时无法读取')
             })
+            .finally(() => { if (!cancelled) setReportsLoading(false) })
 
         api.getDashboardTrackingBoard()
             .then(res => {
@@ -45,295 +57,209 @@ export default function Dashboard() {
             .catch(error => {
                 if (cancelled) return
                 console.error('Failed to load tracking board summary:', error)
-                setTrackingBoard(null)
-                setDashboardError(prev => prev || (error instanceof Error ? error.message : '加载跟踪看板摘要失败'))
+                setTrackingError(error instanceof Error ? error.message : '跟踪标的暂时无法读取')
             })
+            .finally(() => { if (!cancelled) setTrackingLoading(false) })
 
-        return () => {
-            cancelled = true
-        }
-    }, [user?.id])
+        return () => { cancelled = true }
+    }, [userId])
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 text-[#243746] dark:text-[#E8EDF1]">
             <PromoBanner />
-            {dashboardError && (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
-                    {dashboardError}
-                </div>
-            )}
-            <div className="flex items-center justify-between">
+            <header className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">控制台</h1>
-                    <p className="mt-1 text-slate-500 dark:text-slate-400">
-                        {user?.email ? `当前账户：${user.email}` : '嘉实财富 · AI 投研课堂 Demo'}
-                        <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">仅供教学研究</span>
+                    <p className={`mb-2 text-xs tracking-wide ${secondaryText}`}>
+                        {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
                     </p>
+                    <h1 className="text-2xl font-semibold">今日工作</h1>
+                    <p className={`mt-2 text-sm ${secondaryText}`}>从关注标的开始，回看最新研究与当前任务。</p>
                 </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard
-                    icon={Activity}
-                    label="Agent 状态"
-                    value={`${inProgressAgents} 进行中`}
-                    subValue={`${completedAgents} 已完成`}
-                    color="blue"
-                />
-                <StatCard
-                    icon={CheckCircle}
-                    label="分析任务"
-                    value={isAnalyzing ? '分析中' : '空闲'}
-                    subValue={isAnalyzing ? '请稍候...' : '准备就绪'}
-                    color={isAnalyzing ? 'orange' : 'green'}
-                />
-                <StatCard
-                    icon={FileText}
-                    label="累计报告"
-                    value={reportTotal !== null ? `${reportTotal}` : '-'}
-                    subValue="份分析报告"
-                    color="purple"
-                />
-                <StatCard
-                    icon={TrendingUp}
-                    label="系统状态"
-                    value="正常"
-                    subValue="所有服务运行中"
-                    color="green"
-                />
-            </div>
-
-            <TrackingBoardSummary
-                trackingBoard={trackingBoard}
-                onOpen={() => navigate('/tracking-board')}
-            />
-
-            <div className="card">
-                <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">快速开始</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <QuickActionCard
-                        title="开始新分析"
-                        description="输入股票代码，启动多 Agent 智能分析"
-                        action="开始分析"
-                        onClick={() => navigate('/analysis')}
-                    />
-                    <QuickActionCard
-                        title="查看历史报告"
-                        description="浏览已完成的分析报告"
-                        action="查看报告"
-                        onClick={() => navigate('/reports')}
-                    />
-                    <QuickActionCard
-                        title="系统设置"
-                        description="配置 API 和分析参数"
-                        action="打开设置"
-                        onClick={() => navigate('/settings')}
-                    />
-                </div>
-            </div>
-
-            <div className="card">
-                <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">最近分析</h2>
-                    {recentReports.length > 0 && (
-                        <button
-                            onClick={() => navigate('/reports')}
-                            className="flex items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"
-                        >
-                            查看全部 <ArrowRight className="h-3.5 w-3.5" />
-                        </button>
-                    )}
-                </div>
-
-                {recentReports.length === 0 ? (
-                    <p className="py-8 text-center text-slate-400 dark:text-slate-500">
-                        暂无分析记录，
-                        <button onClick={() => navigate('/analysis')} className="text-blue-500 hover:underline">
-                            开始新分析
-                        </button>
-                    </p>
-                ) : (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                        {recentReports.map(report => {
-                            const decisionColor = report.decision?.toUpperCase().includes('BUY') || report.decision?.includes('增持')
-                                ? 'text-red-600 dark:text-red-400'
-                                : report.decision?.toUpperCase().includes('SELL') || report.decision?.includes('减持')
-                                    ? 'text-green-600 dark:text-green-400'
-                                    : 'text-slate-500 dark:text-slate-400'
-                            return (
-                                <div
-                                    key={report.id}
-                                    className="mx-[-1rem] flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                                    onClick={() => navigate(`/reports?report=${report.id}`)}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-500/10">
-                                            <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-slate-900 dark:text-slate-100 text-sm">{report.name || report.symbol}</p>
-                                            <p className="text-xs text-slate-400 dark:text-slate-500">{report.trade_date}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <span className={`text-sm font-medium ${decisionColor}`}>
-                                            {report.decision || '-'}
-                                        </span>
-                                        {report.confidence != null && (
-                                            <span className="text-xs text-slate-400">{report.confidence}%</span>
-                                        )}
-                                        <p className="hidden text-xs text-slate-400 dark:text-slate-500 sm:block">
-                                            {report.created_at ? new Date(report.created_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
-                                        </p>
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
-                )}
-            </div>
-        </div>
-    )
-}
-
-function TrackingBoardSummary({
-    trackingBoard,
-    onOpen,
-}: {
-    trackingBoard: TrackingBoardResponse | null
-    onOpen: () => void
-}) {
-    const itemCount = trackingBoard?.items.length ?? 0
-    const quotedCount = trackingBoard?.items.filter(item => item.quote_source).length ?? 0
-    const latestQuoteTime = trackingBoard?.items
-        .map(item => item.quote_time)
-        .filter((value): value is string => Boolean(value))[0] ?? null
-
-    return (
-        <div className="card">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">跟踪看板摘要</h2>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        控制台仅展示元数据，持仓明细、区间图和交易建议请进入完整看板查看。
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    onClick={onOpen}
-                    className="flex items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"
-                >
-                    查看完整看板 <ArrowRight className="h-3.5 w-3.5" />
+                <button type="button" onClick={() => navigate('/analysis')} className="btn-primary flex min-h-11 items-center gap-2">
+                    <Plus className="h-4 w-4" aria-hidden="true" />新建研究
                 </button>
-            </div>
+            </header>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <MetaCard
-                    label="跟踪标的"
-                    value={`${itemCount} 只`}
-                    subValue={itemCount > 0 ? `共 ${itemCount} 只标的` : '尚未导入持仓'}
-                />
-                <MetaCard
-                    label="价格覆盖"
-                    value={itemCount > 0 ? `${quotedCount}/${itemCount}` : '--'}
-                    subValue={trackingBoard ? `刷新间隔 ${trackingBoard.refresh_interval_seconds}s` : '等待看板数据'}
-                />
-                <MetaCard
-                    label="最近更新"
-                    value={formatDashboardTime(latestQuoteTime)}
-                    subValue={trackingBoard?.previous_trade_date ? `上一交易日 ${trackingBoard.previous_trade_date}` : '暂无交易日信息'}
-                />
-                <MetaCard
-                    label="状态"
-                    value={itemCount > 0 ? '已就绪' : '待导入'}
-                    subValue={itemCount > 0 ? '明细已收起，点击进入查看' : '前往跟踪看板导入持仓'}
-                />
+            <dl className="flex flex-wrap gap-x-8 gap-y-3 border-y border-[#DFE5E9] py-4 text-sm dark:border-[#31424F]">
+                <div className="flex items-baseline gap-3">
+                    <dt className={secondaryText}>跟踪标的</dt>
+                    <dd className="font-semibold tabular-nums">{trackingLoading ? '读取中' : trackedCount != null ? `${trackedCount} 只` : '—'}</dd>
+                </div>
+                <div className="flex items-baseline gap-3">
+                    <dt className={secondaryText}>研究记录</dt>
+                    <dd className="font-semibold tabular-nums">{reportsLoading ? '读取中' : reportTotal != null ? `${reportTotal} 份` : '—'}</dd>
+                </div>
+                <div className="flex items-baseline gap-3">
+                    <dt className={secondaryText}>当前会话</dt>
+                    <dd>{isAnalyzing ? '研究进行中' : analysisRunState === 'failed' ? '上次研究失败' : '无进行中的研究'}</dd>
+                </div>
+            </dl>
+
+            <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,1fr)]">
+                <section className="card min-w-0 !p-0" aria-labelledby="tracked-heading">
+                    <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-5 sm:px-6">
+                        <div>
+                            <h2 id="tracked-heading" className="text-base font-semibold">关注标的</h2>
+                            <p className={`mt-1.5 text-xs ${secondaryText}`}>已导入持仓的跟踪摘要</p>
+                        </div>
+                        <button type="button" onClick={() => navigate('/tracking-board')} className={`flex min-h-8 items-center gap-1 text-sm hover:underline ${secondaryText}`}>
+                            完整看板<ArrowRight className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                    </div>
+                    {trackingLoading ? (
+                        <LoadingNote label="正在读取跟踪标的…" />
+                    ) : trackingError ? (
+                        <div role="alert" className="border-t border-[#DFE5E9] px-6 py-8 dark:border-[#31424F]">
+                            <p className="text-sm text-[#AF423F] dark:text-[#E1A3A0]">跟踪摘要暂不可用</p>
+                            <p className={`mt-2 break-words text-sm leading-6 ${secondaryText}`}>{trackingError}</p>
+                        </div>
+                    ) : !trackedCount ? (
+                        <div className="border-t border-[#DFE5E9] px-6 py-12 dark:border-[#31424F]">
+                            <h3 className="text-base font-medium">开始持续跟踪一个标的</h3>
+                            <p className={`mt-2 text-sm leading-6 ${secondaryText}`}>在跟踪看板导入持仓后，这里会显示最新行情和关联研究。</p>
+                            <button type="button" onClick={() => navigate('/tracking-board')} className="btn-secondary mt-5 min-h-11">打开跟踪看板</button>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[470px] text-left text-sm">
+                                    <thead className="border-y border-[#DFE5E9] bg-[#F4F6F8] dark:border-[#31424F] dark:bg-[#111B24]">
+                                        <tr>
+                                            <th scope="col" className={`px-6 py-3 font-medium ${secondaryText}`}>标的</th>
+                                            <th scope="col" className={`px-4 py-3 font-medium ${secondaryText}`}>最新行情</th>
+                                            <th scope="col" className={`px-6 py-3 text-right font-medium ${secondaryText}`}>关联研究日期</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[#DFE5E9] dark:divide-[#31424F]">
+                                        {trackingBoard?.items.slice(0, 8).map(item => (
+                                            <tr key={item.symbol} className="hover:bg-[#F4F6F8] dark:hover:bg-[#1D303E]">
+                                                <td className="px-6 py-4">
+                                                    <button type="button" onClick={() => navigate('/tracking-board')} className="text-left hover:underline">
+                                                        <span className="block font-medium">{item.name || item.symbol}</span>
+                                                        {item.name && <span className={`mt-1 block text-xs tabular-nums ${secondaryText}`}>{item.symbol}</span>}
+                                                    </button>
+                                                </td>
+                                                <td className="px-4 py-4 tabular-nums">
+                                                    <div className="flex items-baseline gap-2 whitespace-nowrap">
+                                                        <span className="font-medium">{formatLivePrice(item.live_price)}</span>
+                                                        {item.price_change_pct != null && Number.isFinite(item.price_change_pct) && (
+                                                            <span className={`text-xs ${item.price_change_pct > 0 ? 'text-[#AF423F] dark:text-[#E1A3A0]' : item.price_change_pct < 0 ? 'text-[#287461] dark:text-[#98C8B5]' : secondaryText}`} aria-label={`日涨跌幅 ${formatPriceChange(item.price_change_pct)}`}>
+                                                                {formatPriceChange(item.price_change_pct)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className={`mt-1 block whitespace-nowrap text-xs ${secondaryText}`}>
+                                                        {item.quote_time ? formatDashboardTime(item.quote_time) : item.live_price != null ? '时间未提供' : '行情暂缺'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right tabular-nums">
+                                                    {item.analysis ? (
+                                                        <button type="button" onClick={() => navigate(`/reports?report=${item.analysis?.report_id}`)} className="hover:underline">{item.analysis.trade_date}</button>
+                                                    ) : <span className={secondaryText}>暂无研究</span>}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className={`flex flex-wrap justify-between gap-2 border-t border-[#DFE5E9] px-6 py-4 text-xs dark:border-[#31424F] ${secondaryText}`}>
+                                <span>行情覆盖 {quotedCount}/{trackedCount} 只{trackedCount > 8 ? ' · 展示前 8 只' : ''}</span>
+                                <span>持仓明细与区间行情请查看完整看板</span>
+                            </div>
+                        </>
+                    )}
+                </section>
+
+                <div className="min-w-0 space-y-6">
+                    <section className="card !p-0" aria-labelledby="recent-heading">
+                        <div className="flex items-center justify-between gap-3 px-5 py-5 sm:px-6">
+                            <h2 id="recent-heading" className="text-base font-semibold">最近研究</h2>
+                            <button type="button" onClick={() => navigate('/reports')} className={`flex min-h-8 items-center gap-1 text-sm hover:underline ${secondaryText}`}>全部报告<ArrowRight className="h-4 w-4" aria-hidden="true" /></button>
+                        </div>
+                        {reportsLoading ? <LoadingNote label="正在读取最近研究…" /> : reportsError ? (
+                            <div role="alert" className="border-t border-[#DFE5E9] px-6 py-8 dark:border-[#31424F]">
+                                <p className="text-sm text-[#AF423F] dark:text-[#E1A3A0]">最近研究暂不可用</p>
+                                <p className={`mt-2 break-words text-sm leading-6 ${secondaryText}`}>{reportsError}</p>
+                            </div>
+                        ) : recentReports.length === 0 ? (
+                            <div className="border-t border-[#DFE5E9] px-6 py-10 dark:border-[#31424F]">
+                                <FileText className={`mb-4 h-5 w-5 ${secondaryText}`} aria-hidden="true" />
+                                <h3 className="text-base font-medium">还没有研究记录</h3>
+                                <p className={`mt-2 text-sm leading-6 ${secondaryText}`}>新建研究后，可在这里继续阅读和回看。</p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-[#DFE5E9] border-t border-[#DFE5E9] dark:divide-[#31424F] dark:border-[#31424F]">
+                                {recentReports.map(report => (
+                                    <button key={report.id} type="button" onClick={() => navigate(`/reports?report=${report.id}`)} className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-[#F4F6F8] dark:hover:bg-[#1D303E] sm:px-6">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium">{report.name || report.symbol}</p>
+                                            <p className={`mt-1 text-xs leading-5 tabular-nums ${secondaryText}`}>{report.symbol} · 研究日 {report.trade_date}</p>
+                                            <p className={`mt-1 text-xs tabular-nums ${secondaryText}`}>记录时间 {formatDashboardTime(report.created_at)}</p>
+                                        </div>
+                                        <span className={`shrink-0 pt-0.5 text-sm ${reportDecisionTone(report)}`}>{reportStatusLabel(report)}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+
+                    <section className="card" aria-labelledby="current-task-heading">
+                        <div className="flex items-center justify-between gap-3">
+                            <h2 id="current-task-heading" className="text-base font-semibold">当前研究</h2>
+                            {isAnalyzing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                        </div>
+                        {isAnalyzing ? (
+                            <>
+                                <p className="mt-4 text-sm font-medium tabular-nums">{currentSymbol}</p>
+                                <p className={`mt-2 text-sm leading-6 ${secondaryText}`}>{activeAgents.length ? activeAgents.map(agent => agent.name).join('、') : '等待下一阶段更新'}</p>
+                                <p className={`mt-2 text-xs ${secondaryText}`}>已完成 {completedAgents} 项研究步骤</p>
+                                <button type="button" onClick={() => navigate('/analysis')} className="btn-secondary mt-4 min-h-11">查看研究进展</button>
+                            </>
+                        ) : analysisRunState === 'failed' ? (
+                            <>
+                                <p className="mt-4 text-sm text-[#AF423F] dark:text-[#E1A3A0]">{currentSymbol} · 上次研究失败</p>
+                                <p className={`mt-2 break-words text-sm leading-6 ${secondaryText}`}>{analysisRunError || '请进入标的研究查看任务详情。'}</p>
+                                <button type="button" onClick={() => navigate('/analysis')} className="btn-secondary mt-4 min-h-11">查看任务</button>
+                            </>
+                        ) : <p className={`mt-4 text-sm leading-6 ${secondaryText}`}>当前会话没有进行中的研究。你可以新建研究，或从最近报告继续阅读。</p>}
+                    </section>
+                </div>
             </div>
         </div>
     )
 }
 
-function MetaCard({
-    label,
-    value,
-    subValue,
-}: {
-    label: string
-    value: string
-    subValue: string
-}) {
-    return (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/40">
-            <p className="text-xs uppercase tracking-[0.14em] text-slate-400">{label}</p>
-            <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{subValue}</p>
-        </div>
-    )
+function LoadingNote({ label }: { label: string }) {
+    return <p role="status" className={`border-t border-[#DFE5E9] px-6 py-12 text-sm dark:border-[#31424F] ${secondaryText}`}>{label}</p>
+}
+
+function reportStatusLabel(report: Report): string {
+    if (report.status === 'pending') return '排队中'
+    if (report.status === 'running') return '研究中'
+    if (report.status === 'failed') return '研究失败'
+    return parseDecisionPresentation(report.decision).label
+}
+
+function reportDecisionTone(report: Report): string {
+    if (report.status !== 'completed') return secondaryText
+    const { action } = parseDecisionPresentation(report.decision)
+    if (action === 'buy' || action === 'add') return 'text-[#AF423F] dark:text-[#E1A3A0]'
+    if (action === 'sell' || action === 'reduce') return 'text-[#287461] dark:text-[#98C8B5]'
+    return secondaryText
 }
 
 function formatDashboardTime(value?: string | null): string {
-    if (!value) return '--'
+    if (!value) return '时间未提供'
     const parsed = new Date(value.replace(' ', 'T'))
     if (Number.isNaN(parsed.getTime())) return value
-    return parsed.toLocaleString('zh-CN', {
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-    })
+    return parsed.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-interface StatCardProps {
-    icon: React.ComponentType<{ className?: string }>
-    label: string
-    value: string
-    subValue: string
-    color: 'blue' | 'green' | 'orange' | 'purple' | 'red'
+function formatLivePrice(value?: number | null): string {
+    if (value == null || !Number.isFinite(value)) return '—'
+    return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 20 })
 }
 
-function StatCard({ icon: Icon, label, value, subValue, color }: StatCardProps) {
-    const colorClasses = {
-        blue: 'bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
-        green: 'bg-green-100 dark:bg-green-500/10 text-green-600 dark:text-green-400',
-        orange: 'bg-orange-100 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400',
-        purple: 'bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400',
-        red: 'bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400',
-    }
-
-    return (
-        <div className="card card-hover">
-            <div className="flex items-start justify-between">
-                <div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{label}</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{value}</p>
-                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{subValue}</p>
-                </div>
-                <div className={`rounded-lg p-3 ${colorClasses[color]}`}>
-                    <Icon className="h-5 w-5" />
-                </div>
-            </div>
-        </div>
-    )
-}
-
-interface QuickActionCardProps {
-    title: string
-    description: string
-    action: string
-    onClick: () => void
-}
-
-function QuickActionCard({ title, description, action, onClick }: QuickActionCardProps) {
-    return (
-        <button
-            onClick={onClick}
-            className="block w-full rounded-lg border border-slate-200 bg-white p-4 text-left transition-all duration-200 hover:border-blue-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/30 dark:hover:border-blue-500 dark:hover:bg-slate-800/50"
-        >
-            <h3 className="font-medium text-slate-900 dark:text-slate-100">{title}</h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p>
-            <span className="mt-3 inline-block text-sm text-blue-600 dark:text-blue-400">
-                {action} →
-            </span>
-        </button>
-    )
+function formatPriceChange(value: number): string {
+    return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
 }

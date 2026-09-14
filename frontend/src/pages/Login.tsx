@@ -1,41 +1,8 @@
 import { FormEvent, useMemo, useState } from 'react'
-import { ArrowRight, CheckCircle2, Loader2, LockKeyhole, Mail, Radar, ShieldCheck, Sparkles, TrendingUp } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Loader2, LockKeyhole, Mail, Sparkles, Rocket, ShieldCheck } from 'lucide-react'
 import { api } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 import { useNavigate } from 'react-router-dom'
-
-const SIGNALS = [
-    { label: '研究框架', value: '14-Agent' },
-    { label: '工作区', value: '私有' },
-    { label: '报告流', value: '实时' },
-]
-
-const AGENT_GROUPS = [
-    {
-        title: '分析团队',
-        count: '6',
-        items: ['市场分析', '舆情分析', '新闻分析', '基本面分析', '宏观分析', '主力资金'],
-        description: '围绕行情、情绪、新闻、财务、宏观与资金流建立初始判断。',
-    },
-    {
-        title: '研究团队',
-        count: '3',
-        items: ['多头研究', '空头研究', '研究总监'],
-        description: '组织多空辩论，收敛成投资计划与核心分歧。',
-    },
-    {
-        title: '交易与风控',
-        count: '4',
-        items: ['交易员', '激进风控', '中性风控', '稳健风控'],
-        description: '生成执行方案，并从不同风险偏好给出约束。',
-    },
-    {
-        title: '组合决策',
-        count: '1',
-        items: ['组合经理'],
-        description: '综合研究与风控结论，输出最终决策。',
-    },
-]
 
 export default function Login() {
     const navigate = useNavigate()
@@ -44,10 +11,40 @@ export default function Login() {
     const [code, setCode] = useState('')
     const [step, setStep] = useState<'email' | 'code'>('email')
     const [loading, setLoading] = useState(false)
+    const [demoLoading, setDemoLoading] = useState(false)
+    const [masterLoading, setMasterLoading] = useState(false)
     const [message, setMessage] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
 
-    const submitLabel = useMemo(() => step === 'email' ? '发送验证码' : '进入研究终端', [step])
+    const submitLabel = useMemo(() => step === 'email' ? '发送验证码' : '登录工作台', [step])
+
+    const handleDemoLogin = async () => {
+        setDemoLoading(true)
+        setError(null)
+        try {
+            const res = await api.demoLogin()
+            setAuth(res.access_token, res.user)
+            navigate('/analysis', { replace: true })
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Demo 登录失败，请稍后重试')
+        } finally {
+            setDemoLoading(false)
+        }
+    }
+
+    const handleMasterLogin = async () => {
+        setMasterLoading(true)
+        setError(null)
+        try {
+            const res = await api.masterLogin()
+            setAuth(res.access_token, res.user)
+            navigate('/analysis', { replace: true })
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '老 K 主账号登录失败')
+        } finally {
+            setMasterLoading(false)
+        }
+    }
 
     const handleRequestCode = async (e: FormEvent) => {
         e.preventDefault()
@@ -81,117 +78,113 @@ export default function Login() {
     }
 
     return (
-        <div className="flex min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_0%_0%,rgba(34,211,238,0.16),transparent_28%),radial-gradient(circle_at_100%_0%,rgba(37,99,235,0.16),transparent_24%),linear-gradient(180deg,#f6f8fb_0%,#edf2f7_100%)] px-5 py-8 dark:bg-[radial-gradient(circle_at_0%_0%,rgba(34,211,238,0.18),transparent_22%),radial-gradient(circle_at_100%_0%,rgba(59,130,246,0.18),transparent_24%),linear-gradient(180deg,#020617_0%,#0b1120_100%)] md:px-10">
-            <div className="mx-auto grid flex-1 max-w-7xl grid-cols-1 gap-10 lg:grid-cols-[1.12fr_0.88fr] lg:gap-0">
-                <section className="relative flex flex-col justify-between px-2 py-4 lg:px-8 lg:py-10">
-                    <div className="absolute left-0 top-0 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl dark:bg-cyan-400/10" />
-                    <div className="absolute bottom-10 right-16 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl dark:bg-blue-500/10" />
-
-                    <div className="relative">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/85 px-3 py-1.5 text-xs tracking-[0.18em] text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
-                            <Radar className="h-3.5 w-3.5 text-cyan-500" />
-                            嘉实财富 · AI 投研课堂 Demo
+        <div className="flex min-h-screen flex-col bg-[#F4F6F8] px-5 py-4 text-[#243746] dark:bg-[#111B24] dark:text-[#E8EDF1] sm:px-10 sm:py-10">
+            <div className="mx-auto flex w-full max-w-[1120px] flex-1 items-center py-3 lg:py-10">
+                <main className="grid w-full overflow-hidden rounded-lg border border-[#DFE5E9] bg-white dark:border-[#31424F] dark:bg-[#172530] lg:min-h-[660px] lg:grid-cols-[1fr_1fr]">
+                    <section className="flex flex-col justify-between bg-[#172D40] px-6 py-6 text-white sm:px-10 lg:p-12">
+                        <div className="flex items-center gap-4">
+                            <span className="h-8 w-0.5 bg-[#92764E]" aria-hidden="true" />
+                            <div>
+                                <p className="text-xl font-semibold tracking-[0.12em]">老 K 自建</p>
+                                <p className="mt-1 text-xs tracking-[0.16em] text-[#BECAD4]">投研工作台</p>
+                            </div>
                         </div>
-
-                        <div className="mt-4 inline-flex max-w-xl items-center rounded-2xl border border-amber-200/80 bg-amber-50/90 px-3.5 py-2 text-xs leading-5 text-amber-900/90 dark:border-amber-900/40 dark:bg-amber-950/50 dark:text-amber-200/90">
-                            仅供教学研究，不构成投资建议；不连接实盘
-                        </div>
-
-                        <div className="mt-8 max-w-3xl">
-                            <h1 className="text-4xl font-semibold tracking-[-0.04em] text-slate-950 dark:text-white md:text-6xl">
-                                用自然语言
-                                <span className="mt-2 block bg-gradient-to-r from-slate-700 via-cyan-700 to-slate-800 bg-clip-text text-transparent dark:from-slate-200 dark:via-cyan-300 dark:to-slate-100">
-                                    体验多智能体投研
-                                </span>
+                        <div className="pt-5 lg:py-16">
+                            <p className="mb-5 hidden text-xs tracking-[0.18em] text-[#BECAD4] lg:block">研究 · 跟踪 · 复盘</p>
+                            <h1 className="text-2xl font-medium leading-[1.6] lg:text-4xl lg:tracking-wide">
+                                从研究依据，<br className="hidden lg:block" />到清晰判断。
                             </h1>
-                            <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 dark:text-slate-300 md:text-lg">
-                                课堂演示：打开系统 → 点击示例「调研茅台短线」→ 观察 14 个 Agent 协作与辩论 → 查看结构化结论（方向、置信度、目标价、止损、风险）。输出仅供教学参考。
+                            <p className="mt-2 text-sm leading-6 text-[#BECAD4] lg:hidden">围绕标的、依据与风险开展研究。</p>
+                            <p className="mt-6 hidden max-w-sm text-sm leading-7 text-[#BECAD4] lg:block">
+                                查阅标的研究、关注关键分歧，<br />在持续跟踪中回看每一次判断。
                             </p>
                         </div>
-
-                        <div className="mt-10 grid gap-3 sm:grid-cols-3">
-                            {SIGNALS.map((item) => (
-                                <div key={item.label} className="rounded-[28px] border border-slate-200/80 bg-white/88 p-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[0_18px_44px_rgba(2,6,23,0.32)]">
-                                    <div className="text-[11px] tracking-[0.18em] text-slate-400 dark:text-slate-500">{item.label}</div>
-                                    <div className="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-50">{item.value}</div>
-                                </div>
-                            ))}
+                        <div className="hidden border-t border-white/15 pt-6 text-xs leading-6 text-[#BECAD4] lg:block">
+                            老 K 自建 · 投研工作台
                         </div>
-                    </div>
+                    </section>
 
-                    <div className="relative mt-10 rounded-[36px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[0_28px_88px_rgba(2,6,23,0.5)] lg:mt-0">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <div className="text-[11px] tracking-[0.22em] text-slate-400 dark:text-slate-500">14-AGENT 架构</div>
-                                <div className="mt-2 text-xl font-semibold text-slate-950 dark:text-white">协同分工概览</div>
-                            </div>
-                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
-                                <Sparkles className="h-5 w-5" />
-                            </div>
-                        </div>
+                    <section className="flex items-center px-6 py-7 sm:px-12 lg:p-12" aria-label="账户登录">
+                        <div className="w-full">
+                            <p className="text-xs font-medium tracking-[0.14em] text-[#657582] dark:text-[#A4B2BE]">账户登录</p>
+                            <h2 className="mt-2 text-2xl font-semibold">欢迎使用</h2>
+                            <p className="mt-1.5 text-sm leading-6 text-[#657582] dark:text-[#A4B2BE]">现场扫码体验或使用账号登录工作台。</p>
 
-                        <div className="mt-6 grid gap-3 md:grid-cols-2">
-                            {AGENT_GROUPS.map((group) => (
-                                <div key={group.title} className="rounded-[24px] border border-slate-200/80 bg-slate-50/90 p-4 dark:border-slate-800/90 dark:bg-slate-900">
-                                    <div className="flex items-center justify-between">
-                                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{group.title}</div>
-                                        <div className="rounded-full bg-cyan-500/10 px-2.5 py-0.5 text-xs font-medium text-cyan-600 dark:text-cyan-300">
-                                            {group.count} 名
+                            {/* 现场观众 / Demo 试用一键免密通道 */}
+                            <div className="mt-5 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-gradient-to-br from-blue-50/90 via-indigo-50/40 to-slate-50 dark:from-blue-950/40 dark:via-slate-900 dark:to-slate-900 p-4 shadow-xs">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-500/30">
+                                            <Sparkles className="h-5 w-5" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                                现场演示 · 观众免密体验通道
+                                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/80 dark:text-blue-300">
+                                                    已锁死 Gemini 算力
+                                                </span>
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                已预置专属 Google Gemini (3.8 Flash) 算力，扫码直接体验，无需任何选择与配置
+                                            </p>
                                         </div>
                                     </div>
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        {group.items.map((item) => (
-                                            <span key={item} className="rounded-full bg-white px-2.5 py-1 text-xs text-slate-600 shadow-sm dark:bg-slate-800 dark:text-slate-200 dark:ring-1 dark:ring-slate-700/70">
-                                                {item}
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <div className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">{group.description}</div>
                                 </div>
-                            ))}
-                        </div>
 
-                        <div className="mt-5 flex items-start gap-3 rounded-[24px] bg-slate-950 px-4 py-4 text-slate-100 dark:border dark:border-slate-800/80 dark:bg-slate-900">
-                            <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
-                            <div className="text-sm leading-6 text-slate-300">
-                                登录后可持续保存研究历史、模型配置与分析上下文，用于跟踪同一标的在不同日期下的判断演进。
+                                <div className="mt-4 flex flex-col sm:flex-row gap-2.5">
+                                    <button
+                                        type="button"
+                                        disabled={demoLoading || loading}
+                                        onClick={handleDemoLogin}
+                                        className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 text-sm font-semibold shadow-sm transition-all duration-150 disabled:opacity-50"
+                                    >
+                                        {demoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+                                        <span>一键进入 Demo 体验</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={masterLoading || loading}
+                                        onClick={handleMasterLogin}
+                                        title="演示主持人免密直达管理主账号"
+                                        className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 py-2.5 px-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs transition-colors disabled:opacity-50"
+                                    >
+                                        {masterLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />}
+                                        <span>老 K 主持人登录</span>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                </section>
 
-                <section className="flex items-center px-2 py-4 lg:justify-end lg:px-8 lg:py-10">
-                    <div className="w-full max-w-md">
-                        <div className="rounded-[36px] border border-slate-200/80 bg-white/92 p-7 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800/90 dark:bg-slate-950 dark:shadow-[0_28px_88px_rgba(2,6,23,0.56)]">
-                            <div className="flex items-center justify-between">
+                            {/* 分割线 */}
+                            <div className="relative my-6">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-[#DFE5E9] dark:border-[#31424F]" />
+                                </div>
+                                <div className="relative flex justify-center text-xs">
+                                    <span className="bg-white dark:bg-[#172530] px-3 text-[#657582] dark:text-[#A4B2BE]">
+                                        或使用邮箱验证码登录
+                                    </span>
+                                </div>
+                            </div>
+
+                            <ol className="flex gap-6 border-b border-[#DFE5E9] text-sm dark:border-[#31424F]" aria-label="登录步骤">
+                                <li aria-current={step === 'email' ? 'step' : undefined} className={`border-b-2 pb-3 ${step === 'email' ? 'border-[#172D40] font-medium dark:border-[#E8EDF1]' : 'border-transparent text-[#657582] dark:text-[#A4B2BE]'}`}>1. 邮箱地址</li>
+                                <li aria-current={step === 'code' ? 'step' : undefined} className={`border-b-2 pb-3 ${step === 'code' ? 'border-[#172D40] font-medium dark:border-[#E8EDF1]' : 'border-transparent text-[#657582] dark:text-[#A4B2BE]'}`}>2. 验证码</li>
+                            </ol>
+
+
+                            <form onSubmit={step === 'email' ? handleRequestCode : handleVerify} className="mt-7 space-y-5">
                                 <div>
-                                    <div className="text-[11px] tracking-[0.22em] text-slate-400 dark:text-slate-500">身份验证</div>
-                                    <h2 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">进入个人研究空间</h2>
-                                </div>
-                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600 text-white shadow-[0_12px_30px_rgba(37,99,235,0.28)]">
-                                    <ShieldCheck className="h-6 w-6" />
-                                </div>
-                            </div>
-
-                            <div className="mt-6 flex items-center gap-2 rounded-2xl bg-slate-100 p-1 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
-                                <div className={`flex-1 rounded-xl px-3 py-2 text-center text-sm transition-colors ${step === 'email' ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
-                                    邮箱验证
-                                </div>
-                                <div className={`flex-1 rounded-xl px-3 py-2 text-center text-sm transition-colors ${step === 'code' ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
-                                    输入验证码
-                                </div>
-                            </div>
-
-                            <form onSubmit={step === 'email' ? handleRequestCode : handleVerify} className="mt-6 space-y-4">
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium text-slate-600 dark:text-slate-400">邮箱地址</label>
+                                    <label htmlFor="login-email" className="mb-2 block text-sm font-medium">邮箱地址</label>
                                     <div className="relative">
-                                        <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                        <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#657582] dark:text-[#A4B2BE]" aria-hidden="true" />
                                         <input
+                                            id="login-email"
                                             type="email"
+                                            autoComplete="email"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
-                                            className="input h-12 w-full rounded-2xl pl-11"
+                                            className="input h-12 w-full pl-10"
                                             placeholder="you@example.com"
                                             disabled={loading || step === 'code'}
                                             required
@@ -201,14 +194,17 @@ export default function Login() {
 
                                 {step === 'code' && (
                                     <div>
-                                        <label className="mb-2 block text-sm font-medium text-slate-600 dark:text-slate-400">验证码</label>
+                                        <label htmlFor="login-code" className="mb-2 block text-sm font-medium">验证码</label>
                                         <div className="relative">
-                                            <LockKeyhole className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                            <LockKeyhole className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#657582] dark:text-[#A4B2BE]" aria-hidden="true" />
                                             <input
+                                                id="login-code"
                                                 type="text"
+                                                inputMode="numeric"
+                                                autoComplete="one-time-code"
                                                 value={code}
                                                 onChange={(e) => setCode(e.target.value)}
-                                                className="input h-12 w-full rounded-2xl pl-11 tracking-[0.35em]"
+                                                className="input h-12 w-full pl-10 tabular-nums tracking-[0.2em]"
                                                 placeholder="输入 6 位验证码"
                                                 maxLength={6}
                                                 required
@@ -218,20 +214,19 @@ export default function Login() {
                                 )}
 
                                 {message && (
-                                    <div className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                                    <div role="status" className="flex items-start gap-2 rounded border border-[#C3D8D0] bg-[#F0F6F3] px-3 py-3 text-sm leading-6 text-[#287461] dark:border-[#355E50] dark:bg-[#1C332B] dark:text-[#98C8B5]">
+                                        <CheckCircle2 className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
                                         <span>{message}</span>
                                     </div>
                                 )}
                                 {error && (
-                                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/12 dark:text-rose-200">
-                                        {error}
-                                    </div>
+                                    <div role="alert" className="rounded border border-[#E5C9C7] bg-[#FBF2F1] px-3 py-3 text-sm leading-6 text-[#AF423F] dark:border-[#63403E] dark:bg-[#372827] dark:text-[#E1A3A0]">{error}</div>
                                 )}
 
-                                <button type="submit" disabled={loading} className="btn-primary flex h-12 w-full items-center justify-center gap-2 rounded-2xl">
-                                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                                <button type="submit" disabled={loading} className="btn-primary flex min-h-12 w-full items-center justify-center gap-2">
+                                    {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                                     {submitLabel}
+                                    {!loading && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
                                 </button>
 
                                 {step === 'code' && (
@@ -243,29 +238,20 @@ export default function Login() {
                                             setMessage(null)
                                             setError(null)
                                         }}
-                                        className="btn-secondary flex h-12 w-full items-center justify-center rounded-2xl"
+                                        className="btn-secondary flex min-h-11 w-full items-center justify-center"
                                     >
                                         重新获取验证码
                                     </button>
                                 )}
                             </form>
 
-                            <div className="mt-6 rounded-2xl bg-slate-100/90 px-4 py-3 text-xs leading-6 text-slate-500 dark:border dark:border-slate-800/80 dark:bg-slate-900 dark:text-slate-400">
-                                当前账户将独占保存报告历史、模型密钥与分析上下文，适合持续跟踪个人研究对象。
-                            </div>
+                            <p className="mt-7 border-t border-[#DFE5E9] pt-5 text-xs leading-6 text-[#657582] dark:border-[#31424F] dark:text-[#A4B2BE]">登录后可查看当前账户保存的研究报告与跟踪标的。</p>
                         </div>
-                    </div>
-                </section>
+                    </section>
+                </main>
             </div>
-
-            <footer className="mx-auto max-w-7xl pb-4 pt-2 text-center text-xs text-slate-400 dark:text-slate-500">
-                <p className="mb-1 text-amber-700/80 dark:text-amber-300/80">仅供教学研究，不构成投资建议；不连接实盘</p>
-                <p>
-                    &copy; {new Date().getFullYear()} 嘉实财富课堂 Demo · 基于 TradingAgents-AShare &middot; 仅限非商业用途（PolyForm NC 1.0） &middot;{' '}
-                    <a href="https://github.com/KylinMountain/TradingAgents-AShare" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-slate-600 dark:hover:text-slate-300">
-                        上游 GitHub
-                    </a>
-                </p>
+            <footer className="pb-2 text-center text-xs text-[#657582] dark:text-[#A4B2BE]">
+                &copy; {new Date().getFullYear()} 老 K 自建 · 投研工作台
             </footer>
         </div>
     )

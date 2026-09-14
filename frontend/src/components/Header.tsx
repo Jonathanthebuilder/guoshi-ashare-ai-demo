@@ -1,38 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, BellOff, ChevronDown, LogOut, Monitor, Moon, Settings, Sun, Megaphone, Users } from 'lucide-react'
+import { Bell, BellOff, ChevronDown, FileText, Info, LogOut, Menu, Monitor, Moon, Settings, Sun, Users } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
-import type { Announcement } from '@/types'
 import GithubIcon from './GithubIcon'
 
 type ThemeMode = 'system' | 'light' | 'dark'
 
 function getInitials(email?: string | null): string {
-    if (!email) return 'TA'
+    if (!email) return 'K'
     return email.slice(0, 2).toUpperCase()
 }
 
-function formatAnnouncementTime(value?: string): string {
-    if (!value) return ''
-    const parsed = new Date(value)
-    if (Number.isNaN(parsed.getTime())) return value
-    return parsed.toLocaleDateString('zh-CN', {
-        month: 'numeric',
-        day: 'numeric',
-    })
+interface HeaderProps {
+    mobileOpen: boolean
+    onToggleMobile: () => void
 }
 
-export default function Header() {
+export default function Header({ mobileOpen, onToggleMobile }: HeaderProps) {
     const navigate = useNavigate()
     const { user, logout } = useAuthStore()
     const [themeMode, setThemeMode] = useState<ThemeMode>('system')
     const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default')
     const [menuOpen, setMenuOpen] = useState(false)
-    const [announcementOpen, setAnnouncementOpen] = useState(false)
-    const [announcement, setAnnouncement] = useState<Announcement | null>(null)
     const menuRef = useRef<HTMLDivElement | null>(null)
-    const announceRef = useRef<HTMLDivElement | null>(null)
 
     useEffect(() => {
         const saved = (localStorage.getItem('ta-theme') || 'system') as ThemeMode
@@ -43,31 +33,22 @@ export default function Header() {
     }, [])
 
     useEffect(() => {
-        if (!user) return
-        let cancelled = false
-        api.getLatestAnnouncement()
-            .then((data) => {
-                if (!cancelled) setAnnouncement(data)
-            })
-            .catch(() => {
-                if (!cancelled) setAnnouncement(null)
-            })
-        return () => {
-            cancelled = true
-        }
-    }, [user])
-
-    useEffect(() => {
         const onClick = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
                 setMenuOpen(false)
             }
-            if (announceRef.current && !announceRef.current.contains(event.target as Node)) {
-                setAnnouncementOpen(false)
-            }
+        }
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return
+            if (menuRef.current?.contains(document.activeElement)) menuRef.current.querySelector('button')?.focus()
+            setMenuOpen(false)
         }
         document.addEventListener('mousedown', onClick)
-        return () => document.removeEventListener('mousedown', onClick)
+        document.addEventListener('keydown', onKeyDown)
+        return () => {
+            document.removeEventListener('mousedown', onClick)
+            document.removeEventListener('keydown', onKeyDown)
+        }
     }, [])
 
     const applyTheme = (mode: ThemeMode) => {
@@ -76,6 +57,14 @@ export default function Header() {
         const shouldBeDark = mode === 'system' ? systemDark : mode === 'dark'
         root.classList.toggle('dark', shouldBeDark)
     }
+
+    useEffect(() => {
+        if (themeMode !== 'system') return
+        const media = window.matchMedia('(prefers-color-scheme: dark)')
+        const onChange = () => applyTheme('system')
+        media.addEventListener('change', onChange)
+        return () => media.removeEventListener('change', onChange)
+    }, [themeMode])
 
     const cycleTheme = () => {
         const next: ThemeMode =
@@ -98,213 +87,45 @@ export default function Header() {
     const themeLabel = themeMode === 'system' ? '跟随系统' : themeMode === 'light' ? '浅色' : '深色'
     const ThemeIcon = themeMode === 'system' ? Monitor : themeMode === 'light' ? Sun : Moon
     const accountTone = useMemo(() => getInitials(user?.email), [user?.email])
-    const announcementStorageKey = announcement ? `ta-announcement-read:${announcement.id}` : null
-    const hasUnreadAnnouncement = Boolean(
-        announcement &&
-        announcementStorageKey &&
-        localStorage.getItem(announcementStorageKey) !== '1'
-    )
-
-    const handleAnnouncementToggle = () => {
-        const next = !announcementOpen
-        setAnnouncementOpen(next)
-        if (next && announcementStorageKey) {
-            localStorage.setItem(announcementStorageKey, '1')
-        }
-    }
 
     return (
-        <header className="h-16 sticky top-0 z-40 border-b border-slate-200/80 dark:border-slate-800 bg-white/88 dark:bg-slate-950/78 backdrop-blur-xl">
-            <div className="h-full px-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="hidden md:flex items-center gap-4">
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-cyan-600/90 shadow-[0_0_14px_rgba(8,145,178,0.35)]" />
-                            <div>
-                                <div className="text-sm font-semibold tracking-[0.02em] text-slate-900 dark:text-slate-100">嘉实财富 · AI 投研课堂 Demo</div>
-                                <div className="text-[11px] tracking-[0.12em] text-slate-400 dark:text-slate-500">教学研究 · 非投资建议</div>
-                            </div>
-                        </div>
-                        <div className="h-4 w-px bg-slate-200 dark:bg-slate-800" />
-                        <div className="text-xs tracking-[0.18em] text-slate-400 dark:text-slate-500">课堂演示</div>
+        <header className="workspace-header sticky top-0 z-40 h-16">
+            <div className="flex h-full items-center justify-between gap-3 px-4 sm:px-6 lg:px-7">
+                <div className="flex min-w-0 items-center gap-2.5">
+                    <button onClick={onToggleMobile} className="workspace-icon-button md:hidden" aria-label={mobileOpen ? '关闭导航' : '打开导航'} aria-expanded={mobileOpen} aria-controls="primary-navigation"><Menu className="h-5 w-5" /></button>
+                    <div className="truncate text-sm font-medium tracking-[.02em]">
+                        <span className="hidden sm:inline">老 K 自建 · </span>投研工作台
                     </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                    {announcement && (
-                        <div className="relative" ref={announceRef}>
-                            <button
-                                onClick={handleAnnouncementToggle}
-                                className="group relative flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/90 transition-all"
-                                title={announcement.title}
-                            >
-                                <Megaphone className="w-4 h-4 text-slate-700 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
-                                <span className="hidden sm:inline text-[13px] font-medium text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white">
-                                    {announcement.tag || '公告'}
-                                </span>
-                                {hasUnreadAnnouncement && (
-                                    <span className="absolute right-2 top-1.5 w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]" />
-                                )}
-                            </button>
-
-                            {announcementOpen && (
-                                <div className="absolute right-0 top-full mt-3 w-[360px] p-4 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-[0_24px_80px_rgba(15,23,42,0.18)] z-50">
-                                    <div className="flex items-start justify-between gap-3 mb-3">
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
-                                                    {announcement.tag || '公告'}
-                                                </span>
-                                                <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                                                    {formatAnnouncementTime(announcement.published_at)}
-                                                </span>
-                                            </div>
-                                            <div className="mt-2 text-sm font-bold text-slate-900 dark:text-slate-100">
-                                                {announcement.title}
-                                            </div>
-                                            {announcement.summary && (
-                                                <div className="mt-1 text-[12px] leading-relaxed text-slate-500 dark:text-slate-400">
-                                                    {announcement.summary}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        {announcement.items.map((item) => (
-                                            <div key={item.title} className="group">
-                                                <div className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 group-hover:scale-125 transition-transform" />
-                                                    {item.title}
-                                                </div>
-                                                <div className="mt-0.5 pl-3 text-[12px] text-slate-500 dark:text-slate-500 leading-relaxed">
-                                                    {item.detail}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {announcement.cta_label && announcement.cta_path && (
-                                        <button
-                                            onClick={() => {
-                                                setAnnouncementOpen(false)
-                                                navigate(announcement.cta_path!)
-                                            }}
-                                            className="mt-4 w-full py-2 rounded-xl bg-slate-50 dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 transition-colors"
-                                        >
-                                            {announcement.cta_label}
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    {/* classroom demo: sponsor entry de-emphasized */}
-                    <Link
-                        to="/thanks"
-                        className="group flex items-center gap-2 rounded-2xl border border-amber-200 dark:border-amber-900 bg-white dark:bg-slate-900 px-3 py-1.5 hover:border-amber-300 dark:hover:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-all mr-1"
-                        title="致谢名单"
-                    >
-                        <Users className="w-4 h-4 text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300" />
-                        <span className="text-[13px] font-medium text-amber-600 dark:text-amber-400 group-hover:text-amber-700 dark:group-hover:text-amber-300 hidden sm:inline">致谢</span>
-                    </Link>
-                    <a
-                        href="https://github.com/KylinMountain/TradingAgents-AShare"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/90 transition-all mr-1"
-                        title="Star us on GitHub"
-                    >
-                        <GithubIcon className="w-4 h-4 text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white" />
-                        <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white hidden sm:inline">Star</span>
-                    </a>
+                <div className="flex shrink-0 items-center gap-2">
                     {user && (
                         <div className="relative" ref={menuRef}>
-                            <button
-                                onClick={() => setMenuOpen(v => !v)}
-                                className="group flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1.5 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/90 transition-all"
-                            >
-                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600 text-white flex items-center justify-center text-[11px] font-bold shadow-[0_10px_20px_rgba(37,99,235,0.2)]">
-                                    {accountTone}
-                                </div>
-                                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+                            <button onClick={() => setMenuOpen((open) => !open)} className="flex items-center gap-2 rounded p-1 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800" aria-label="账户与偏好设置" aria-expanded={menuOpen} aria-controls="workspace-account">
+                                <div className="flex h-8 w-8 items-center justify-center rounded bg-[#172d40] text-[11px] font-medium text-white dark:bg-slate-700">{accountTone}</div>
+                                <span className="hidden text-xs workspace-muted lg:inline">我的工作台</span>
+                                <ChevronDown className={`h-3.5 w-3.5 workspace-muted transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
                             </button>
-
                             {menuOpen && (
-                                <div className="absolute right-0 top-[calc(100%+0.75rem)] w-64 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-[0_24px_80px_rgba(15,23,42,0.18)] overflow-hidden">
-                                    <div className="px-4 py-3.5 border-b border-slate-100 dark:border-slate-900">
-                                        <div className="text-[11px] tracking-[0.18em] text-slate-400 dark:text-slate-500">研究空间</div>
-                                        <div className="mt-1.5 text-sm font-medium leading-6 text-slate-950 dark:text-slate-50 break-all">{user.email}</div>
+                                <div id="workspace-account" className="workspace-menu fixed left-4 right-4 top-[72px] z-50 max-h-[calc(100dvh-88px)] overflow-y-auto sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-72">
+                                    <div className="border-b px-5 py-4"><div className="text-xs workspace-muted">当前账户</div><div className="mt-1.5 break-all text-sm">{user.email}</div></div>
+                                    <div className="space-y-0.5 p-2">
+                                        <button onClick={cycleTheme} className="workspace-menu-item"><ThemeIcon className="h-4 w-4 workspace-muted" /><span className="flex-1">界面主题</span><span className="text-xs workspace-muted">{themeLabel}</span></button>
+                                        <button onClick={toggleNotifications} className="workspace-menu-item">
+                                            {notifPermission === 'denied' ? <BellOff className="h-4 w-4 workspace-muted" /> : <Bell className="h-4 w-4 workspace-muted" />}
+                                            <span className="flex-1">通知提醒</span><span className="text-xs workspace-muted">{notifPermission === 'granted' ? '已启用' : notifPermission === 'denied' ? '已拒绝' : '未设置'}</span>
+                                        </button>
+                                        <button onClick={() => { setMenuOpen(false); navigate('/reports') }} className="workspace-menu-item"><FileText className="h-4 w-4 workspace-muted" />我的研究报告</button>
+                                        <button onClick={() => { setMenuOpen(false); navigate('/settings') }} className="workspace-menu-item"><Settings className="h-4 w-4 workspace-muted" />工作台设置</button>
+                                        <details className="group">
+                                            <summary className="workspace-menu-item list-none [&::-webkit-details-marker]:hidden"><Info className="h-4 w-4 workspace-muted" /><span className="flex-1">关于工作台</span><ChevronDown className="h-3.5 w-3.5 workspace-muted transition-transform group-open:rotate-180" /></summary>
+                                            <div className="mx-3 mb-2 border-l pl-3">
+                                                <Link to="/thanks" onClick={() => setMenuOpen(false)} className="workspace-menu-item"><Users className="h-4 w-4 workspace-muted" />致谢名单</Link>
+                                                <a href="https://github.com/KylinMountain/TradingAgents-AShare" target="_blank" rel="noopener noreferrer" className="workspace-menu-item"><GithubIcon className="h-4 w-4 workspace-muted" />项目源码</a>
+                                                <div className="px-3 pb-2 pt-1 text-[11px] leading-5 workspace-muted"><div>版本 {__APP_BUILD_VERSION__}</div><div>{__APP_BUILD_DATE__} · {__APP_BUILD_COMMIT__}</div></div>
+                                            </div>
+                                        </details>
                                     </div>
-                                    <div className="p-2">
-                                        <button
-                                            onClick={cycleTheme}
-                                            className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
-                                        >
-                                            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
-                                                <ThemeIcon className="w-4 h-4" />
-                                            </div>
-                                            <div className="flex-1 text-left">
-                                                <div>主题模式</div>
-                                                <div className="text-xs text-slate-400 dark:text-slate-500">{themeLabel}</div>
-                                            </div>
-                                        </button>
-                                        <button
-                                            onClick={toggleNotifications}
-                                            className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
-                                        >
-                                            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center relative">
-                                                {notifPermission === 'denied' ? <BellOff className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
-                                                <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${
-                                                    notifPermission === 'granted' ? 'bg-emerald-500' : notifPermission === 'denied' ? 'bg-rose-500' : 'bg-slate-400'
-                                                }`} />
-                                            </div>
-                                            <div className="flex-1 text-left">
-                                                <div>通知提醒</div>
-                                                <div className="text-xs text-slate-400 dark:text-slate-500">
-                                                    {notifPermission === 'granted' ? '已启用' : notifPermission === 'denied' ? '已拒绝' : '未设置'}
-                                                </div>
-                                            </div>
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setMenuOpen(false)
-                                                navigate('/reports')
-                                            }}
-                                            className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
-                                        >
-                                            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
-                                                <Monitor className="w-4 h-4" />
-                                            </div>
-                                            我的报告
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setMenuOpen(false)
-                                                navigate('/settings')
-                                            }}
-                                            className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
-                                        >
-                                            <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
-                                                <Settings className="w-4 h-4" />
-                                            </div>
-                                            模型设置
-                                        </button>
-                                    </div>
-                                    <div className="p-2 border-t border-slate-100 dark:border-slate-900">
-                                        <button
-                                            onClick={() => {
-                                                setMenuOpen(false)
-                                                logout()
-                                            }}
-                                            className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
-                                        >
-                                            <div className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center">
-                                                <LogOut className="w-4 h-4" />
-                                            </div>
-                                            退出登录
-                                        </button>
-                                    </div>
+                                    <div className="border-t p-2"><button onClick={() => { setMenuOpen(false); logout() }} className="workspace-menu-item text-[#af423f] dark:text-red-300"><LogOut className="h-4 w-4" />退出登录</button></div>
                                 </div>
                             )}
                         </div>

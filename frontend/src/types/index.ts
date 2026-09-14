@@ -95,6 +95,7 @@ export interface AnalysisRequest {
     constraints?: string[]
     user_notes?: string
     config_overrides?: Record<string, unknown>
+    profile_id?: string
     dry_run?: boolean
 }
 
@@ -266,6 +267,11 @@ export interface AnalysisReport {
     trader_investment_plan?: string
     risk_feedback_state?: RiskFeedbackState
     final_trade_decision?: string
+    profile_id?: string
+    profile_name?: string
+    model_name?: string
+    llm_provider?: string
+    result_data?: Record<string, unknown>
 }
 
 // UI Types
@@ -336,6 +342,10 @@ export interface Report {
     key_metrics?: KeyMetric[]
     created_at?: string
     updated_at?: string
+    profile_id?: string
+    profile_name?: string
+    model_name?: string
+    llm_provider?: string
     waiting_ahead_count?: number | null
     scheduled_running_count?: number | null
     scheduled_concurrency_limit?: number | null
@@ -571,6 +581,52 @@ export interface RuntimeConfig {
     email_report_enabled?: boolean
     wecom_report_enabled?: boolean
     default_analysts?: string[]
+    active_profile_id?: string | null
+    active_profile_name?: string | null
+}
+
+export interface LLMProfile {
+    id: string
+    name: string
+    provider: string
+    backend_url?: string | null
+    quick_think_llm?: string | null
+    deep_think_llm?: string | null
+    has_api_key?: boolean
+    api_key_hint?: string | null
+    is_default: boolean
+    created_at?: string | null
+    updated_at?: string | null
+}
+
+export interface LLMProfileCreateRequest {
+    name: string
+    provider: string
+    backend_url?: string
+    quick_think_llm?: string
+    deep_think_llm?: string
+    api_key?: string
+    is_default?: boolean
+}
+
+export interface LLMProfileUpdateRequest {
+    name?: string
+    provider?: string
+    backend_url?: string
+    quick_think_llm?: string
+    deep_think_llm?: string
+    api_key?: string
+    clear_api_key?: boolean
+    is_default?: boolean
+}
+
+export interface LLMProfileTestRequest {
+    provider?: string
+    backend_url?: string
+    quick_think_llm?: string
+    deep_think_llm?: string
+    api_key?: string
+    profile_id?: string
 }
 
 export interface RuntimeConfigUpdateResponse {

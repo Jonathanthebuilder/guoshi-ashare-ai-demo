@@ -1,4 +1,4 @@
-import type { AnalysisRequest, AnalysisResponse, Announcement, AuthUser, AuthVerifyResponse, JobStatus, AnalysisReport, KlineResponse, LatestAnnouncementResponse, PortfolioImportState, PortfolioOverviewResponse, PortfolioPositionInput, Report, ReportDetail, ReportListResponse, RuntimeConfig, RuntimeConfigUpdate, RuntimeConfigUpdateResponse, RuntimeWarmupRequest, RuntimeWarmupResponse, WatchlistItem, WatchlistBatchResponse, ScheduledAnalysis, ScheduledBatchTriggerResponse, StockSearchResult, TrackingBoardResponse, UserToken, UserTokenCreateRequest, WecomWarmupRequest, WecomWarmupResponse, FeedbackItem, FeedbackListResponse, FeedbackUnreadResponse } from '@/types'
+import type { AnalysisRequest, AnalysisResponse, Announcement, AuthUser, AuthVerifyResponse, JobStatus, AnalysisReport, KlineResponse, LatestAnnouncementResponse, LLMProfile, LLMProfileCreateRequest, LLMProfileUpdateRequest, LLMProfileTestRequest, PortfolioImportState, PortfolioOverviewResponse, PortfolioPositionInput, Report, ReportDetail, ReportListResponse, RuntimeConfig, RuntimeConfigUpdate, RuntimeConfigUpdateResponse, RuntimeWarmupRequest, RuntimeWarmupResponse, WatchlistItem, WatchlistBatchResponse, ScheduledAnalysis, ScheduledBatchTriggerResponse, StockSearchResult, TrackingBoardResponse, UserToken, UserTokenCreateRequest, WecomWarmupRequest, WecomWarmupResponse, FeedbackItem, FeedbackListResponse, FeedbackUnreadResponse } from '@/types'
 
 export function getBaseUrl(): string {
     const envUrl = (import.meta.env.VITE_API_URL as string) || ''
@@ -86,6 +86,7 @@ class ApiService {
         messages: Array<{ role: string; content: string }>,
         stream = true,
         selectedAnalysts?: string[],
+        profileId?: string,
     ) {
         const response = await fetch(`${getBaseUrl()}/v1/chat/completions`, {
             method: 'POST',
@@ -97,6 +98,7 @@ class ApiService {
                 messages,
                 stream,
                 selected_analysts: selectedAnalysts,
+                profile_id: profileId,
             }),
         })
 
@@ -261,6 +263,44 @@ class ApiService {
         return this.request<{ results: StockSearchResult[] }>(`/v1/market/stock-search?q=${encodeURIComponent(q)}`)
     }
 
+    // LLM Profiles
+    async getLLMProfiles(): Promise<LLMProfile[]> {
+        return this.request<LLMProfile[]>('/v1/llm-profiles')
+    }
+
+    async createLLMProfile(data: LLMProfileCreateRequest): Promise<LLMProfile> {
+        return this.request<LLMProfile>('/v1/llm-profiles', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        })
+    }
+
+    async updateLLMProfile(id: string, data: LLMProfileUpdateRequest): Promise<LLMProfile> {
+        return this.request<LLMProfile>(`/v1/llm-profiles/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        })
+    }
+
+    async deleteLLMProfile(id: string): Promise<{ status: string; message: string }> {
+        return this.request<{ status: string; message: string }>(`/v1/llm-profiles/${id}`, {
+            method: 'DELETE',
+        })
+    }
+
+    async setDefaultLLMProfile(id: string): Promise<LLMProfile> {
+        return this.request<LLMProfile>(`/v1/llm-profiles/${id}/default`, {
+            method: 'POST',
+        })
+    }
+
+    async testLLMProfile(data: LLMProfileTestRequest): Promise<{ status: string; message: string; probe?: unknown }> {
+        return this.request<{ status: string; message: string; probe?: unknown }>('/v1/llm-profiles/test', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        })
+    }
+
     async getConfig(): Promise<RuntimeConfig> {
         return this.request<RuntimeConfig>('/v1/config')
     }
@@ -297,6 +337,19 @@ class ApiService {
         return this.request('/v1/auth/verify-code', {
             method: 'POST',
             body: JSON.stringify({ email, code }),
+        })
+    }
+
+    async demoLogin(nickname?: string): Promise<AuthVerifyResponse> {
+        return this.request('/v1/auth/demo-login', {
+            method: 'POST',
+            body: JSON.stringify({ nickname }),
+        })
+    }
+
+    async masterLogin(): Promise<AuthVerifyResponse> {
+        return this.request('/v1/auth/master-login', {
+            method: 'POST',
         })
     }
 

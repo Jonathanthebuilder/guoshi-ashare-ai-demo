@@ -109,9 +109,10 @@ export default function KlinePanel({ symbol, onSymbolChange }: KlinePanelProps) 
 
     useEffect(() => {
         if (!containerRef.current) return
+        const chartContainer = containerRef.current
 
         const textColor = isDark ? '#94a3b8' : '#475569'
-        const gridColor = isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(203, 213, 225, 0.6)'
+        const gridColor = isDark ? 'rgba(49, 66, 79, 0.45)' : 'rgba(223, 229, 233, 0.55)'
         const bgColor = isDark ? 'transparent' : 'transparent'
 
         const chart = createChart(containerRef.current, {
@@ -152,10 +153,10 @@ export default function KlinePanel({ symbol, onSymbolChange }: KlinePanelProps) 
         })
 
         const series = chart.addSeries(CandlestickSeries, {
-            upColor: '#ef4444',
-            downColor: '#22c55e',
-            wickUpColor: '#ef4444',
-            wickDownColor: '#22c55e',
+            upColor: '#AF423F',
+            downColor: '#287461',
+            wickUpColor: '#AF423F',
+            wickDownColor: '#287461',
             borderVisible: false,
         })
 
@@ -194,7 +195,7 @@ export default function KlinePanel({ symbol, onSymbolChange }: KlinePanelProps) 
         const handleDblClick = () => {
             chartRef.current?.timeScale().fitContent()
         }
-        containerRef.current.addEventListener('dblclick', handleDblClick)
+        chartContainer.addEventListener('dblclick', handleDblClick)
 
         const onResize = () => {
             if (!containerRef.current || !chartRef.current) return
@@ -204,10 +205,13 @@ export default function KlinePanel({ symbol, onSymbolChange }: KlinePanelProps) 
             })
         }
 
+        const observer = new ResizeObserver(onResize)
+        observer.observe(chartContainer)
         window.addEventListener('resize', onResize)
         return () => {
+            observer.disconnect()
             window.removeEventListener('resize', onResize)
-            containerRef.current?.removeEventListener('dblclick', handleDblClick)
+            chartContainer.removeEventListener('dblclick', handleDblClick)
             chart.unsubscribeCrosshairMove(handleCrosshairMove)
             chartRef.current?.remove()
             chartRef.current = null
@@ -222,6 +226,10 @@ export default function KlinePanel({ symbol, onSymbolChange }: KlinePanelProps) 
             if (!seriesRef.current) return
             setLoading(true)
             setError(null)
+            setCandles([])
+            candlesRef.current = []
+            setActiveCandle(null)
+            seriesRef.current.setData([])
             try {
                 const resp = await api.getKline(symbol, range.start, range.end)
                 const data: CandlestickData[] = resp.candles.flatMap((c) => {
@@ -274,23 +282,23 @@ export default function KlinePanel({ symbol, onSymbolChange }: KlinePanelProps) 
 
     return (
         <section className="card h-full flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between mb-3 shrink-0">
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-3 shrink-0">
                 <div className="min-w-0 flex items-center gap-3">
-                    <CandlestickChart className="w-5 h-5 text-cyan-500" />
+                    <CandlestickChart className="w-5 h-5 text-slate-500" />
                     <div className="min-w-0 flex flex-wrap items-center gap-x-4 gap-y-1">
-                        <h2 className="truncate text-lg font-semibold text-slate-900 dark:text-slate-100">{getDisplayName(symbol)} K线</h2>
+                        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{getDisplayName(symbol)} K线</h2>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                             <span className="text-slate-500 dark:text-slate-400">{panelCandle?.date || '--'}</span>
-                            <span className={`font-medium ${isUp ? 'text-red-500' : 'text-emerald-500'}`}>收盘 {formatNumber(panelCandle?.close)}</span>
+                            <span className={`font-medium ${isUp ? 'text-market-up' : 'text-market-down'}`}>收盘 {formatNumber(panelCandle?.close)}</span>
                             <span className="text-slate-500 dark:text-slate-400">开盘 {formatNumber(panelCandle?.open)}</span>
-                            <span className={`font-medium ${isUp ? 'text-red-500' : 'text-emerald-500'}`}>{compactChangePercent}</span>
+                            <span className={`font-medium ${isUp ? 'text-market-up' : 'text-market-down'}`}>{compactChangePercent}</span>
                             <span className="text-slate-500 dark:text-slate-400">高/低 {formatNumber(panelCandle?.high)} / {formatNumber(panelCandle?.low)}</span>
                             <span className="text-slate-500 dark:text-slate-400">量 {formatVolume(panelCandle?.volume)}</span>
                             <span className="text-slate-500 dark:text-slate-400">换手 {panelCandle?.turnover_rate == null ? '--' : `${formatNumber(panelCandle.turnover_rate)}%`}</span>
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                     {showCurrentSymbolButton && (
                         <button
                             onClick={() => onSymbolChange?.(currentAnalysisSymbol)}
@@ -313,7 +321,7 @@ export default function KlinePanel({ symbol, onSymbolChange }: KlinePanelProps) 
                     ))}
                 </div>
             </div>
-            <div className="relative flex-1 min-h-0 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 overflow-hidden">
+            <div className="relative flex-1 min-h-0 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 overflow-hidden">
                 <div ref={containerRef} className="absolute inset-0" />
                 {loading && (
                     <div className="absolute right-3 top-3 text-xs px-2 py-1 rounded bg-white/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-400 flex items-center gap-1">

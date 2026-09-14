@@ -1,5 +1,5 @@
-import { FileText, Download, ChevronDown, ChevronRight, Loader2, MousePointerClick } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { FileText, Download, Loader2 } from 'lucide-react'
+import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useAnalysisStore } from '@/stores/analysisStore'
@@ -7,247 +7,144 @@ import type { ReportDetail } from '@/types'
 import { sanitizeReportMarkdown } from '@/utils/reportText'
 
 const REPORT_SECTIONS = [
-    { key: 'market_report', title: '市场分析报告', team: '分析团队' },
-    { key: 'sentiment_report', title: '舆情分析报告', team: '分析团队' },
-    { key: 'news_report', title: '新闻分析报告', team: '分析团队' },
-    { key: 'fundamentals_report', title: '基本面分析报告', team: '分析团队' },
-    { key: 'macro_report', title: '宏观板块报告', team: '分析团队' },
-    { key: 'smart_money_report', title: '主力资金报告', team: '分析团队' },
-    { key: 'volume_price_report', title: '量价分析报告', team: '分析团队' },
-    { key: 'investment_plan', title: '研究团队决策', team: '研究团队' },
-    { key: 'trader_investment_plan', title: '交易团队计划', team: '交易团队' },
-    { key: 'final_trade_decision', title: '最终交易决策', team: '组合管理' },
+    { key: 'final_trade_decision', title: '研究结论', team: '风险复核与最终判断' },
+    { key: 'investment_plan', title: '综合研判', team: '研究团队' },
+    { key: 'trader_investment_plan', title: '操作计划', team: '交易团队' },
+    { key: 'market_report', title: '市场与技术', team: '分项研究' },
+    { key: 'fundamentals_report', title: '基本面', team: '分项研究' },
+    { key: 'news_report', title: '新闻与事件', team: '分项研究' },
+    { key: 'sentiment_report', title: '市场情绪', team: '分项研究' },
+    { key: 'macro_report', title: '宏观与板块', team: '分项研究' },
+    { key: 'smart_money_report', title: '主力资金', team: '分项研究' },
+    { key: 'volume_price_report', title: '量价关系', team: '分项研究' },
+    { key: 'game_theory_report', title: '博弈分析', team: '分项研究' },
 ]
 
-const REPORT_DISCLAIMER =
-    '> 免责声明：以上内容由模型基于公开数据、历史信息与预设规则自动生成，仅供研究参考，不构成任何投资建议、收益承诺或实际交易指令。'
+const SOURCE_NOTE = '本报告由模型依据本次可用数据生成。具体来源与日期以各章节列示为准；未附出处的陈述尚无可追溯来源。'
 
 const MD_COMPONENTS = {
     table: ({ children }: { children?: React.ReactNode }) => (
-        <table className="w-full border-collapse border border-slate-300 dark:border-slate-600 my-4">{children}</table>
+        <div className="my-5 max-w-full overflow-x-auto"><table className="w-full border-collapse text-sm">{children}</table></div>
     ),
-    thead: ({ children }: { children?: React.ReactNode }) => (
-        <thead className="bg-slate-100 dark:bg-slate-700">{children}</thead>
-    ),
-    th: ({ children }: { children?: React.ReactNode }) => (
-        <th className="border border-slate-300 dark:border-slate-600 px-3 py-2 text-left font-semibold text-slate-700 dark:text-slate-300">{children}</th>
-    ),
-    td: ({ children }: { children?: React.ReactNode }) => (
-        <td className="border border-slate-300 dark:border-slate-600 px-3 py-2 text-slate-600 dark:text-slate-400">{children}</td>
-    ),
-    tr: ({ children }: { children?: React.ReactNode }) => (
-        <tr className="even:bg-slate-50 dark:even:bg-slate-800/50">{children}</tr>
-    ),
+    thead: ({ children }: { children?: React.ReactNode }) => <thead className="bg-[#F4F6F8] dark:bg-slate-800">{children}</thead>,
+    th: ({ children }: { children?: React.ReactNode }) => <th className="border-b border-[#DFE5E9] px-3 py-2 text-left font-semibold dark:border-slate-700">{children}</th>,
+    td: ({ children }: { children?: React.ReactNode }) => <td className="border-b border-[#DFE5E9] px-3 py-2 align-top dark:border-slate-700">{children}</td>,
 }
 
 interface ReportViewerProps {
-    /** 传入后进入历史报告模式，不读取 store */
+    /** Historical report; live mode reads the analysis store. */
     reportData?: ReportDetail
-    /** 当前选中章节（实时模式：点哪个智能体就显示哪个） */
+    /** A chapter requested by another part of the workspace. */
     activeSection?: string
+    /** Increment on each external navigation request, including repeated links. */
+    selectionRequestId?: number
 }
 
-export default function ReportViewer({ reportData, activeSection }: ReportViewerProps = {}) {
-    const { report, streamingSections, isAnalyzing } = useAnalysisStore()
-    const [expandedSections, setExpandedSections] = useState<string[]>([])
-    const isHistorical = !!reportData
-
-    const getSectionContent = (key: string): string => {
-        if (isHistorical) {
-            return sanitizeReportMarkdown((reportData?.[key as keyof ReportDetail] as string | undefined) || '')
-        }
-        const s = streamingSections[key]
-        return sanitizeReportMarkdown(s?.displayed || (report?.[key as keyof typeof report] as string | undefined) || '')
-    }
-
-    const getSectionState = (key: string) => {
-        if (isHistorical) return { isStreaming: false, isComplete: true }
-        const s = streamingSections[key]
+export default function ReportViewer({ reportData, activeSection, selectionRequestId = 0 }: ReportViewerProps = {}) {
+    const { report, streamingSections, isAnalyzing, currentJobId } = useAnalysisStore()
+    const source = reportData ?? report
+    const scope = reportData ? reportData.id : `${currentJobId ?? ''}:${report?.symbol ?? ''}:${report?.trade_date ?? ''}`
+    const [selection, setSelection] = useState<{ scope: string; external?: string; requestId: number; key: string } | null>(null)
+    const isRunning = reportData ? ['pending', 'running'].includes(reportData.status) : isAnalyzing
+    const isFailed = reportData?.status === 'failed'
+    const sections = REPORT_SECTIONS.map(section => {
+        const raw = source?.[section.key as keyof typeof source]
+        const nested = reportData?.result_data?.[section.key as keyof NonNullable<ReportDetail['result_data']>]
+        const sourceContent = sanitizeReportMarkdown((typeof raw === 'string' && raw.trim() ? raw : '') || (typeof nested === 'string' ? nested : ''))
+        const stream = reportData ? undefined : streamingSections[section.key]
+        const streamedContent = sanitizeReportMarkdown(stream?.displayed)
         return {
-            isStreaming: s?.isTyping || false,
-            isComplete: s?.isComplete || !!(report?.[key as keyof typeof report]),
+            ...section,
+            content: isRunning ? streamedContent || sourceContent : sourceContent || streamedContent,
+            exportContent: sourceContent || streamedContent,
+            isStreaming: isRunning && !!stream?.isTyping,
         }
-    }
-
-    const hasAnyContent = isHistorical
-        ? REPORT_SECTIONS.some(s => !!reportData?.[s.key as keyof ReportDetail])
-        : Object.keys(streamingSections).length > 0 || (report && Object.values(report).some(v => typeof v === 'string' && v.length > 0))
-
-    // ── Historical mode: auto-expand first 2 sections with content ────────────
-    useEffect(() => {
-        if (!isHistorical) return
-        const withContent = REPORT_SECTIONS
-            .filter(s => !!reportData?.[s.key as keyof ReportDetail])
-            .map(s => s.key)
-        setExpandedSections(withContent.slice(0, 2))
-    }, [isHistorical, reportData])
-
-    // Historical mode: accordion toggle
-    const toggleSection = (key: string) =>
-        setExpandedSections(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
+    })
+    const availableSections = sections.filter(section => section.content.trim())
+    const requestedKey = selection?.scope === scope && selection.external === activeSection && selection.requestId === selectionRequestId ? selection.key : activeSection
+    const active = sections.find(section => section.key === requestedKey) ?? availableSections[0] ?? sections[0]
+    const hasAnyContent = availableSections.length > 0
+    const marketContext = reportData?.result_data?.market_context ?? (!reportData ? report?.market_context : undefined)
 
     const handleExport = () => {
-        const source = isHistorical ? reportData : report
-        if (!source) return
-        const text = REPORT_SECTIONS
-            .filter(s => source[s.key as keyof typeof source])
-            .map(s => `## ${s.title}\n\n${source[s.key as keyof typeof source]}`)
-            .join('\n\n---\n\n') + `\n\n---\n\n${REPORT_DISCLAIMER}\n`
-        const blob = new Blob([text], { type: 'text/markdown' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `analysis-${isHistorical ? reportData?.symbol : report?.symbol || 'report'}.md`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
+        if (!hasAnyContent) return
+        const text = `# ${source?.symbol || '标的'} · 研究报告\n\n分析日期：${source?.trade_date || '未提供'}\n\n`
+            + availableSections.map(section => `## ${section.title}\n\n${section.exportContent}`).join('\n\n---\n\n')
+            + `\n\n---\n\n${SOURCE_NOTE}\n`
+        const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }))
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = `analysis-${source?.symbol || 'report'}.md`
+        document.body.appendChild(anchor)
+        anchor.click()
+        anchor.remove()
         URL.revokeObjectURL(url)
     }
 
-    // ── Historical mode: full accordion ──────────────────────────────────────
-    if (isHistorical) {
-        if (!hasAnyContent) {
-            return (
-                <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                        <FileText className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
-                        <p className="text-slate-500 dark:text-slate-400">暂无分析报告</p>
-                    </div>
-                </div>
-            )
-        }
-        return (
-            <div className="space-y-2">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-blue-500" />
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">分析报告</h2>
-                    </div>
-                    <button onClick={handleExport} className="btn-secondary flex items-center gap-2 text-sm py-1.5 px-3">
-                        <Download className="w-4 h-4" />
-                        导出
-                    </button>
-                </div>
-                <div className="space-y-3">
-                    {REPORT_SECTIONS.map((section) => {
-                        const content = getSectionContent(section.key)
-                        if (!content) return null
-                        const isExpanded = expandedSections.includes(section.key)
-                        return (
-                            <div key={section.key} className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden bg-white dark:bg-slate-900/40">
-                                <button
-                                    onClick={() => toggleSection(section.key)}
-                                    className="w-full flex items-center justify-between p-4 bg-slate-50/90 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        {isExpanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-                                        <span className="font-medium text-slate-900 dark:text-slate-100">{section.title}</span>
-                                        <span className="text-xs text-slate-500 dark:text-slate-400">{section.team}</span>
-                                    </div>
-                                    <span className="text-xs text-green-500">✓</span>
-                                </button>
-                                {isExpanded && (
-                                    <div className="p-5 bg-white dark:bg-slate-800/30">
-                                        <div className="prose dark:prose-invert prose-sm md:prose-base max-w-none">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>{content}</ReactMarkdown>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )
-                    })}
-                    <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-xs leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{REPORT_DISCLAIMER}</ReactMarkdown>
-                    </div>
-                </div>
-            </div>
-        )
-    }
-
-    // ── Live mode: single-section viewer ─────────────────────────────────────
-    const activeMeta = activeSection ? REPORT_SECTIONS.find(s => s.key === activeSection) : null
-    const activeContent = activeSection ? getSectionContent(activeSection) : ''
-    const { isStreaming: activeStreaming } = activeSection ? getSectionState(activeSection) : { isStreaming: false }
-
     return (
-        <div className="card flex-1 flex flex-col min-h-0 ring-1 ring-slate-200/70 dark:ring-slate-800 shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:shadow-none">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-blue-500" />
-                    <div>
-                        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                            {activeMeta ? activeMeta.title : '分析报告'}
-                        </h2>
-                        {activeMeta ? (
-                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                {activeMeta.team} · 点击其他智能体切换报告
-                            </p>
-                        ) : (
-                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                点击上方智能体卡片查看完整报告
-                            </p>
-                        )}
+        <section className="min-w-0 overflow-hidden rounded-lg border border-[#DFE5E9] bg-white text-[#243746] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            <header className="flex flex-wrap items-start justify-between gap-4 border-b border-[#DFE5E9] px-5 py-5 dark:border-slate-700 sm:px-6">
+                <div>
+                    <div className="mb-1 flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-[#92764E]" />
+                        <h2 className="text-base font-semibold text-[#172D40] dark:text-slate-100">完整研究报告</h2>
+                        {isRunning && <span className="rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-600 dark:border-slate-600 dark:text-slate-300">生成中</span>}
+                        {isFailed && <span className="text-xs text-[#AF423F] dark:text-red-300">本次研究未完成</span>}
                     </div>
-                    {isAnalyzing && (
-                        <span className="badge-orange animate-pulse">生成中</span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs leading-5 text-[#657582] dark:text-slate-400">
+                        {source?.symbol && <span>{source.symbol}</span>}
+                        {source?.trade_date && <span>分析日期 {source.trade_date}</span>}
+                        {marketContext?.data_as_of && <span>数据截至 {marketContext.data_as_of}</span>}
+                        {reportData?.created_at && <span>生成于 {new Date(reportData.created_at).toLocaleString('zh-CN')}</span>}
+                        {(() => {
+                            const modelLabel = reportData?.profile_name || reportData?.model_name || (reportData?.result_data as Record<string, any> | undefined)?.profile_name || (reportData?.result_data as Record<string, any> | undefined)?.model_name || report?.profile_name || report?.model_name
+                            return modelLabel ? (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
+                                    🤖 驱动模型：{modelLabel}
+                                </span>
+                            ) : null
+                        })()}
+                    </div>
                 </div>
-                {hasAnyContent && (
-                    <button onClick={handleExport} className="btn-secondary flex items-center gap-2 text-sm py-1.5 px-3">
-                        <Download className="w-4 h-4" />
-                        导出全部
-                    </button>
-                )}
-            </div>
-
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto min-h-0">
-                {!activeMeta ? (
-                    /* Empty state */
-                    <div className="flex flex-col items-center justify-center py-16 gap-3">
-                        <MousePointerClick className="w-10 h-10 text-slate-300 dark:text-slate-600" />
-                        <p className="text-sm font-medium text-slate-400 dark:text-slate-500">
-                            点击上方智能体卡片查看报告
-                        </p>
-                        {isAnalyzing && !hasAnyContent && (
-                            <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-400 dark:text-slate-500">
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                等待首个章节输出...
-                            </div>
-                        )}
+                <button type="button" onClick={handleExport} disabled={!hasAnyContent} className="btn-secondary inline-flex items-center gap-2 px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40">
+                    <Download className="h-3.5 w-3.5" />导出 Markdown
+                </button>
+            </header>
+            <div className="grid min-w-0 md:grid-cols-[172px_minmax(0,1fr)]">
+                <nav aria-label="报告目录" className="border-b border-[#DFE5E9] bg-[#F8FAFB] p-3 dark:border-slate-700 dark:bg-slate-900 md:border-b-0 md:border-r">
+                    <p className="mb-2 px-2 text-[11px] tracking-wider text-[#657582] dark:text-slate-400">报告目录</p>
+                    <div className="flex gap-1 overflow-x-auto md:sticky md:top-4 md:flex-col">
+                        {sections.map(section => (
+                            <button key={section.key} type="button" aria-current={active.key === section.key ? 'page' : undefined}
+                                disabled={!section.content && !isRunning}
+                                onClick={() => setSelection({ scope, external: activeSection, requestId: selectionRequestId, key: section.key })}
+                                className={`flex shrink-0 items-center justify-between gap-2 rounded px-2 py-2 text-left text-[13px] transition-colors disabled:opacity-40 md:shrink ${active.key === section.key ? 'bg-[#172D40] font-medium text-white dark:bg-slate-700' : 'text-[#657582] hover:bg-slate-200/60 dark:text-slate-400 dark:hover:bg-slate-800'}`}>
+                                {section.title}
+                                {section.isStreaming && <Loader2 className="h-3 w-3 shrink-0 animate-spin" aria-label="正在生成" />}
+                            </button>
+                        ))}
                     </div>
-                ) : (
-                    /* Single section content */
-                    <div className="space-y-4">
-                        <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden bg-white dark:bg-slate-900/40">
-                            <div className="p-5 bg-white dark:bg-slate-800/30">
-                                {activeContent ? (
-                                    <div className="prose dark:prose-invert prose-sm md:prose-base max-w-none">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
-                                            {activeContent}
-                                        </ReactMarkdown>
-                                        {activeStreaming && (
-                                            <span className="inline-block w-2 h-4 bg-blue-500 animate-pulse ml-1" />
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center justify-center py-10 text-slate-400 dark:text-slate-500">
-                                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                        正在生成报告...
-                                    </div>
-                                )}
-                            </div>
+                </nav>
+                <div className="min-w-0 px-5 py-6 sm:px-8 sm:py-8">
+                    <article className="mx-auto max-w-[760px]" aria-label={active.title}>
+                        <div className="mb-6 border-b border-[#DFE5E9] pb-5 dark:border-slate-700">
+                            <p className="mb-2 text-xs text-[#657582] dark:text-slate-400">{active.team}</p>
+                            <h3 className="font-serif text-2xl font-semibold tracking-wide text-[#172D40] dark:text-slate-100">{active.title}</h3>
                         </div>
-
-                        {activeContent && (
-                            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-xs leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{REPORT_DISCLAIMER}</ReactMarkdown>
+                        {active.content ? (
+                            <div className="prose max-w-none break-words text-[15px] leading-[1.8] dark:prose-invert [&_pre]:max-w-full [&_pre]:overflow-x-auto">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>{active.content}</ReactMarkdown>
+                                {active.isStreaming && <p className="mt-4 flex items-center gap-2 text-xs text-[#657582]"><Loader2 className="h-3 w-3 animate-spin" />章节持续生成中</p>}
+                            </div>
+                        ) : (
+                            <div className="py-14 text-center text-sm leading-7 text-[#657582] dark:text-slate-400">
+                                {isRunning ? <><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" />此章节尚在生成，可从目录阅读已有内容。</> : isFailed ? '研究已中断，当前章节未生成。可从目录阅读已保留的内容。' : hasAnyContent ? '本次报告未提供此章节。' : '暂无研究内容。发起研究后，已有章节会显示在这里。'}
                             </div>
                         )}
-                    </div>
-                )}
+                        {active.content && <footer className="mt-10 border-t border-[#DFE5E9] pt-4 text-xs leading-6 text-[#657582] dark:border-slate-700 dark:text-slate-400">{SOURCE_NOTE}</footer>}
+                    </article>
+                </div>
             </div>
-        </div>
+        </section>
     )
 }

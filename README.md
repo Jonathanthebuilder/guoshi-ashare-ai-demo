@@ -1,8 +1,6 @@
-# 嘉实财富 · AI 投研课堂 Demo
+# 老 K 自建 · 投研工作台
 
-基于开源项目 [TradingAgents-AShare](https://github.com/KylinMountain/TradingAgents-AShare) 的课堂演示 fork：用自然语言驱动 14 个 Agent（分析师 / 多空辩论 / 风控 / 组合决策），适合非专业开发者也能理解「AI 如何手搓 A 股投研参考工具」。
-
-> **重要声明：仅供教学研究，不构成投资建议；不连接实盘。** 证券市场有风险，系统输出仅代表算法推演结果，不对任何投资损益负责。
+基于多智能体协同架构（Multi-Agent System）构建的 A 股智能投研工作台：用自然语言驱动 14 个专业智能体（基本面/技术面/消息面/主力资金/多空辩论/三方风控/组合决策），实时对接 A 股公开行情与上市公司财报，实现自动化、结构化投研分析。
 
 <div align="center">
   <img src="assets/web/analysis.png" width="100%" alt="智能分析"/>
@@ -11,19 +9,19 @@
 
 ---
 
-## 嘉实财富课堂 · 5 分钟演示脚本
+## 投研分析演示流程
 
-| 分钟 | 讲解动作 | 要点 |
+| 环节 | 操作与展示 | 核心能力 |
 |------|----------|------|
-| 0–1 | 打开本 Demo UI，指出顶栏标题与免责横幅 | 「嘉实财富 · AI 投研课堂 Demo」；强调教学研究、非投资建议、不连实盘 |
-| 1–2 | 登录后进入「智能分析」页 | 介绍界面：左对话、右 K 线 / Agent / 决策卡 |
-| 2–3.5 | 点击示例芯片：`调研贵州茅台(600519)短线` | 意图识别标的与周期；14 个 Agent 开始协作 |
-| 3.5–4.5 | 点开 Agent 卡片 / 辩论 Drawer | 多空对抗、风控三方、结构化发言流 |
-| 4.5–5 | 展示决策卡：方向、置信度、目标价、止损、风险 | **再次强调：参考非建议** |
+| 1 | 打开工作台，进入「智能分析」界面 | 实时行情看板、Agent 协同状态、多维研报区 |
+| 2 | 输入投研指令：`调研贵州茅台(600519)短线` | 意图识别（标的代码、分析周期、策略偏好） |
+| 3 | 14 个专业智能体同步调度与分析 | 实时抓取行情与财务数据，基本面/技术面/资金流同步推演 |
+| 4 | 多空对抗辩论与风控裁决 | 多头研究员 vs 空头研究员对抗质辩，激进/稳健/中性三方风控平衡 |
+| 5 | 结构化投研报告输出 | 确定投资倾向、置信度、目标价、止损位与关键风险矩阵 |
 
-备用示例：`分析宁德时代(300750)中线`、`调研稀土ETF嘉实(516150)短线`。
+常用示例：`调研贵州茅台(600519)短线`、`分析宁德时代(300750)中线`、`调研比亚迪(002594)短线`。
 
-**无 LLM Key 时**：登录后到「设置」配置模型厂商与 API Key；未配置时请先说明需要自备 Key，避免现场空白报错。本地未配 SMTP 时，登录验证码会直接显示在页面上（开发环境验证码）。
+**模型配置**：登录后在「设置」中配置模型厂商与 API Key。本地未配置邮件服务器时，登录验证码会直接显示在界面上。
 
 ---
 
@@ -130,24 +128,12 @@ curl -X POST 'http://localhost:8000/v1/analyze' \
 
 支持 OpenAI、Anthropic、Gemini、DeepSeek、Moonshot、智谱、硅基流动等 OpenAI 兼容接口。请在前端「设置」中自行配置。
 
-课堂环境默认关闭第三方中转推广横幅（`frontend/src/config/promo.ts` 中 `RELAY_PROMO.enabled = false`）。若个人部署需要，可自行改回。
+默认关闭第三方中转推广横幅（`frontend/src/config/promo.ts` 中 `RELAY_PROMO.enabled = false`）。若个人部署需要，可自行开启。
 
 ---
 
-## 上游与许可
+## 架构说明与许可
 
-- 本课堂 Demo fork 基于 [KylinMountain/TradingAgents-AShare](https://github.com/KylinMountain/TradingAgents-AShare)。
+- 本项目基于 [TradingAgents-AShare](https://github.com/KylinMountain/TradingAgents-AShare) 架构演进，集成了多智能体投研、A 股真实行情直连与可视化辩论系统。
 - 核心架构灵感来自 [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents)（Apache 2.0）。
-- 新增模块（`api/`、`frontend/`）及对核心逻辑的深度修改采用 `PolyForm Noncommercial 1.0.0`。
 - 详情见根目录 [LICENSE](./LICENSE)。
-
-上游在线体验与发行版（非本课堂 fork）：[app.510168.xyz](https://app.510168.xyz) · [Releases](https://github.com/KylinMountain/TradingAgents-AShare/releases)
-
----
-
-## 重要声明
-
-- **仅供学习研究**：学术研究、技术演示与课堂交流用途，不构成任何投资建议。
-- **不连接实盘**：本 Demo 不对接券商交易通道。
-- **实盘风险**：基于本系统生成的任何观点或计划，仅代表算法博弈结果，不对实际投资损益负责。
-- **数据延迟**：依赖数据源可能存在延迟或偏差，请以交易所实时公告为准。

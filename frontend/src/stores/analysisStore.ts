@@ -35,7 +35,7 @@ const createInitialChatMessages = (): ChatMessage[] => [
     {
         id: 'init',
         role: 'assistant',
-        content: '我是你的 A 股多智能体投研助手。直接告诉我你想分析的标的和日期。',
+        content: '请输入股票名称或代码，以及研究日期和持有期限。你也可以补充持仓、关注问题与风险约束。',
         timestamp: new Date().toISOString(),
     },
 ]

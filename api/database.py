@@ -361,6 +361,23 @@ class UserLLMConfigDB(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
+class UserLLMProfileDB(Base):
+    """User LLM configuration profile (allows multiple LLM provider endpoints)."""
+    __tablename__ = "user_llm_profiles"
+
+    id = Column(String(36), primary_key=True, index=True)
+    user_id = Column(String(36), index=True, nullable=False)
+    name = Column(String(100), nullable=False)
+    provider = Column(String(50), nullable=False, default="openai")
+    backend_url = Column(String(500), nullable=True)
+    quick_think_llm = Column(String(255), nullable=True)
+    deep_think_llm = Column(String(255), nullable=True)
+    api_key_encrypted = Column(Text, nullable=True)
+    is_default = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
 class UserTokenDB(Base):
     __tablename__ = "user_tokens"
 

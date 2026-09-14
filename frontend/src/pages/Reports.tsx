@@ -1,7 +1,6 @@
 import { FileText, Download, Trash2, Search, ChevronLeft, ChevronRight, Loader2, History, Clock3 } from 'lucide-react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import TaskProgressBanner from '@/components/TaskProgressBanner'
 import { api } from '@/services/api'
 import type { Report, ReportDetail } from '@/types'
 import DecisionCard from '@/components/DecisionCard'
@@ -9,122 +8,49 @@ import ReportViewer from '@/components/ReportViewer'
 import RiskRadar from '@/components/RiskRadar'
 import KeyMetrics from '@/components/KeyMetrics'
 import { useAuthStore } from '@/stores/authStore'
-import { advanceProgress, getReportRunProgress } from '@/utils/progressFeedback'
-
-type ProgressState = {
-    status: 'idle' | 'loading' | 'success' | 'error'
-    progress: number
-    detail: string | null
-}
-
-const IDLE_PROGRESS: ProgressState = {
-    status: 'idle',
-    progress: 0,
-    detail: null,
-}
-
-const parseDecision = (decisionText?: string): { action: 'add' | 'reduce' | 'hold'; label: string } => {
-    if (!decisionText) return { action: 'hold', label: '观望' }
-    const text = decisionText.toUpperCase()
-    if (text.includes('BUY') || text.includes('增持') || text.includes('买入')) return { action: 'add', label: '增持' }
-    if (text.includes('SELL') || text.includes('减持') || text.includes('卖出')) return { action: 'reduce', label: '减持' }
-    return { action: 'hold', label: '持有' }
-}
+import { parseDecisionPresentation as parseDecision } from '@/utils/decisionPresentation'
 
 const getDecisionColor = (decision?: string) => {
     const { action } = parseDecision(decision)
-    if (action === 'add') return 'text-red-600 dark:text-red-400'
-    if (action === 'reduce') return 'text-green-600 dark:text-green-400'
+    if (action === 'buy' || action === 'add') return 'text-[#AF423F] dark:text-[#E1A3A0]'
+    if (action === 'sell' || action === 'reduce') return 'text-[#287461] dark:text-[#98C8B5]'
     return 'text-slate-600 dark:text-slate-400'
 }
 
 function getQueueHint(report: Pick<Report, 'status' | 'waiting_ahead_count' | 'scheduled_running_count' | 'scheduled_concurrency_limit'>): string | null {
     if (report.status !== 'pending') return null
 
-    const waitingAhead = report.waiting_ahead_count ?? 0
+    const waitingAhead = report.waiting_ahead_count
     const runningCount = report.scheduled_running_count
     const limit = report.scheduled_concurrency_limit
 
     if (runningCount != null && limit != null) {
-        return `前方还有 ${waitingAhead} 项等待，当前 ${runningCount}/${limit} 个任务执行中`
+        return `${waitingAhead != null ? `前方还有 ${waitingAhead} 项等待，` : ''}当前 ${runningCount}/${limit} 个任务执行中`
     }
 
-    return `前方还有 ${waitingAhead} 项等待`
+    return waitingAhead != null ? `前方还有 ${waitingAhead} 项等待` : null
 }
 
 function ActiveReportStatus({ report }: { report: Report }) {
-    const progress = getReportRunProgress({
-        status: report.status,
-        createdAt: report.created_at,
-    })
-    const isPending = report.status === 'pending'
-    const label = isPending ? '排队中' : '分析中'
-    const toneCls = isPending
-        ? 'text-slate-500 dark:text-slate-300'
-        : 'text-blue-600 dark:text-blue-300'
-    const barCls = isPending
-        ? 'from-slate-400 via-slate-500 to-slate-600'
-        : 'from-cyan-500 via-blue-500 to-indigo-500'
     const queueHint = getQueueHint(report)
-
     return (
-        <div className="min-w-[148px] space-y-2">
-            <div className={`flex items-center gap-1.5 text-xs font-medium ${toneCls}`}>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>{label}</span>
-                <span className="ml-auto tabular-nums">{progress}%</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                <div
-                    className={`h-full rounded-full bg-gradient-to-r ${barCls} transition-[width] duration-700 ease-out`}
-                    style={{ width: `${progress}%` }}
-                />
-            </div>
-            {queueHint ? (
-                <p className="text-[11px] leading-4 text-slate-400">{queueHint}</p>
-            ) : null}
+        <div className="min-w-[120px] text-sm text-[#657582] dark:text-[#A4B2BE]">
+            <span>{report.status === 'pending' ? '排队中' : '研究进行中'}</span>
+            {queueHint && <p className="mt-1 max-w-[200px] text-xs leading-5">{queueHint}</p>}
         </div>
     )
 }
 
 function ActiveDetailStatusCard({ report }: { report: ReportDetail }) {
-    const progress = getReportRunProgress({
-        status: report.status,
-        createdAt: report.created_at,
-    })
     const isPending = report.status === 'pending'
-    const title = isPending ? '排队处理中...' : '深度分析中...'
-    const queueHint = getQueueHint(report)
-    const detail = isPending
-        ? (queueHint || '任务已进入队列，正在等待分析资源。')
-        : '正在汇总各路 Agent 的观点，请稍后。'
-
     return (
-        <div className="card h-full min-h-[320px] p-8">
-            <div className="flex h-full flex-col justify-center">
-                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-500/10 dark:text-blue-300">
-                    <Clock3 className="h-7 w-7" />
-                </div>
-                <div className="mx-auto w-full max-w-[280px] text-center">
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{title}</h3>
-                    <p className="mt-2 text-sm text-slate-500">{detail}</p>
-                    <div className="mt-6 text-left">
-                        <div className="mb-2 flex items-center justify-between text-sm">
-                            <span className="font-medium text-slate-600 dark:text-slate-300">当前进度</span>
-                            <span className="font-semibold tabular-nums text-blue-600 dark:text-blue-300">{progress}%</span>
-                        </div>
-                        <div className="h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                            <div
-                                className="h-full rounded-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 transition-[width] duration-700 ease-out"
-                                style={{ width: `${progress}%` }}
-                            />
-                        </div>
-                    </div>
-                    <p className="mt-4 text-xs text-slate-400">
-                        页面会自动刷新任务状态，完成后这里会直接切换为分析结果。
-                    </p>
-                </div>
-            </div>
+        <div className="card min-h-[240px]">
+            <Clock3 className="mb-5 h-5 w-5 text-[#657582] dark:text-[#A4B2BE]" aria-hidden="true" />
+            <h3 className="text-base font-semibold text-[#243746] dark:text-[#E8EDF1]">{isPending ? '研究等待执行' : '研究正在进行'}</h3>
+            <p className="mt-3 text-sm leading-6 text-[#657582] dark:text-[#A4B2BE]">
+                {isPending ? (getQueueHint(report) || '任务已进入队列，等待研究资源。') : '正在整理分析依据与研究结论。'}
+            </p>
+            <p className="mt-5 text-xs leading-6 text-[#657582] dark:text-[#A4B2BE]">任务状态会自动更新，完成后可在这里查看研究结果。</p>
         </div>
     )
 }
@@ -137,13 +63,13 @@ const renderStatusBadge = (report: Report) => {
             return <ActiveReportStatus report={report} />
         case 'failed':
             return (
-                <div className="group relative flex items-center gap-1.5 text-rose-500" title={report.error?.split('\n')[0]}>
-                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                <div className="group relative flex items-center gap-1.5 text-[#AF423F] dark:text-[#E1A3A0]" title={report.error?.split('\n')[0]}>
+                    <div className="w-1.5 h-1.5 rounded-sm bg-[#AF423F]" />
                     <span className="text-xs font-medium">任务失败</span>
                 </div>
             )
         default:
-            const { label } = parseDecision(report.decision)
+            const label = report.decision ? parseDecision(report.decision).label : '建议未提供'
             return (
                 <span className={`font-medium ${getDecisionColor(report.decision)}`}>
                     {label}
@@ -193,66 +119,23 @@ export default function Reports() {
     const [error, setError] = useState<string | null>(null)
     const [deleting, setDeleting] = useState<string | null>(null)
     const [symbolHistory, setSymbolHistory] = useState<Report[]>([])
-    const [listProgress, setListProgress] = useState<ProgressState>(IDLE_PROGRESS)
-    const [detailProgress, setDetailProgress] = useState<ProgressState>(IDLE_PROGRESS)
 
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-
-    useEffect(() => {
-        if (listProgress.status !== 'loading') return
-
-        const timer = window.setInterval(() => {
-            setListProgress((prev) => prev.status === 'loading'
-                ? { ...prev, progress: advanceProgress(prev.progress) }
-                : prev)
-        }, 180)
-
-        return () => window.clearInterval(timer)
-    }, [listProgress.status])
-
-    useEffect(() => {
-        if (detailProgress.status !== 'loading') return
-
-        const timer = window.setInterval(() => {
-            setDetailProgress((prev) => prev.status === 'loading'
-                ? { ...prev, progress: advanceProgress(prev.progress) }
-                : prev)
-        }, 180)
-
-        return () => window.clearInterval(timer)
-    }, [detailProgress.status])
 
     const fetchReports = useCallback(async (targetPage: number, options?: { silent?: boolean }) => {
         const silent = options?.silent === true
         if (!silent) {
             setLoading(true)
             setError(null)
-            setListProgress({
-                status: 'loading',
-                progress: 12,
-                detail: `正在加载第 ${targetPage + 1} 页报告列表...`,
-            })
         }
         try {
             const response = await api.getReports(undefined, targetPage * PAGE_SIZE, PAGE_SIZE)
             setReports(response.reports)
             setTotal(response.total)
-            if (!silent) {
-                setListProgress({
-                    status: 'success',
-                    progress: 100,
-                    detail: `已获取 ${response.reports.length} 条报告记录`,
-                })
-            }
         } catch (err) {
             const message = err instanceof Error ? err.message : '获取报告失败'
             if (!silent) {
                 setError(message)
-                setListProgress({
-                    status: 'error',
-                    progress: 100,
-                    detail: message,
-                })
             }
         } finally {
             if (!silent) {
@@ -295,11 +178,6 @@ export default function Reports() {
             if (!preserveHistory) {
                 setSymbolHistory([])
             }
-            setDetailProgress({
-                status: 'loading',
-                progress: 14,
-                detail: preserveHistory ? '正在恢复你刚刚打开的报告...' : '正在打开报告详情...',
-            })
         }
 
         try {
@@ -316,20 +194,10 @@ export default function Reports() {
 
             if (!silent) {
                 setSearchParamsRef.current({ report: reportId })
-                setDetailProgress({
-                    status: 'success',
-                    progress: 100,
-                    detail: `${detail.name || detail.symbol} 报告已就绪`,
-                })
             }
         } catch (err) {
             const message = err instanceof Error ? err.message : '获取报告详情失败'
             if (!silent) {
-                setDetailProgress({
-                    status: 'error',
-                    progress: 100,
-                    detail: message,
-                })
                 alert(message)
             }
             throw err
@@ -392,62 +260,37 @@ export default function Reports() {
     if (detailLoading) {
         return (
             <div className="flex items-center justify-center py-24">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-[#172D40] dark:text-[#A4B2BE]" />
             </div>
         )
     }
 
     if (selectedReport) {
         const { action } = parseDecision(selectedReport.decision)
-        const selectedReportProgressStatus = selectedReport.status === 'pending' || selectedReport.status === 'running'
-            ? 'loading'
-            : selectedReport.status === 'failed'
-                ? 'error'
-                : 'success'
-        const selectedReportProgressValue = getReportRunProgress({
-            status: selectedReport.status,
-            createdAt: selectedReport.created_at,
-        })
-        const selectedReportProgressDetail = selectedReport.status === 'failed'
-            ? (selectedReport.error || '任务执行失败')
-            : selectedReport.status === 'completed'
-                ? `${selectedReport.name || selectedReport.symbol} 报告已完成`
-                : selectedReport.status === 'pending'
-                    ? (getQueueHint(selectedReport) || '任务排队中 · 进度会自动刷新')
-                    : '多智能体正在协同分析 · 进度会自动刷新'
-
         return (
             <div className="space-y-6">
-                {(selectedReport.status === 'pending' || selectedReport.status === 'running') && (
-                    <TaskProgressBanner
-                        status={selectedReportProgressStatus}
-                        progress={selectedReportProgressValue}
-                        label={selectedReport.status === 'pending' ? '报告任务排队中...' : '报告生成中...'}
-                        detail={selectedReportProgressDetail}
-                    />
-                )}
                 {/* 返回按钮 + 标题 */}
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3">
 
                     <button
                         onClick={() => {
                             setSelectedReport(null)
                             setSearchParams({})
                         }}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        className="btn-secondary flex min-h-11 items-center gap-2 text-sm"
                     >
                         <ChevronLeft className="w-4 h-4" />
                         返回列表
                     </button>
-                    <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                        {selectedReport.name || selectedReport.symbol} 分析报告
+                    <h1 className="text-xl font-semibold text-[#243746] dark:text-[#E8EDF1]">
+                        {selectedReport.name || selectedReport.symbol} 研究报告
                         {selectedReport.name && selectedReport.name !== selectedReport.symbol && (
                             <span className="ml-2 text-base font-normal text-slate-400">{selectedReport.symbol}</span>
                         )}
                     </h1>
                     <button
                         onClick={() => exportReport(selectedReport)}
-                        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        className="btn-secondary ml-auto flex min-h-11 items-center gap-2 text-sm"
                     >
                         <Download className="w-4 h-4" />
                         导出 Markdown
@@ -455,9 +298,9 @@ export default function Reports() {
                 </div>
 
                 {/* 元信息 */}
-                <div className="flex items-center gap-4 text-sm text-slate-500">
-                    <span>分析日期：{selectedReport.trade_date}</span>
-                    <span>生成时间：{selectedReport.created_at ? new Date(selectedReport.created_at).toLocaleString('zh-CN') : '-'}</span>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#DFE5E9] pb-5 text-sm text-[#657582] dark:border-[#31424F] dark:text-[#A4B2BE]">
+                    <span>研究日期：{selectedReport.trade_date}</span>
+                    <span>记录创建：{selectedReport.created_at ? new Date(selectedReport.created_at).toLocaleString('zh-CN') : '-'}</span>
                 </div>
 
                 {/* 历史决策时间线 */}
@@ -469,18 +312,18 @@ export default function Reports() {
                         </div>
                         <div className="flex items-center gap-2 overflow-x-auto pb-1">
                             {symbolHistory.slice().reverse().map(r => {
-                                const { action: a } = parseDecision(r.decision)
-                                const color = a === 'add' ? 'bg-red-500' : a === 'reduce' ? 'bg-green-500' : 'bg-slate-400'
+                                const label = r.status === 'completed' ? (r.decision ? parseDecision(r.decision).label : '建议未提供') : r.status === 'failed' ? '研究失败' : r.status === 'pending' ? '排队中' : '研究中'
+                                const color = r.status === 'completed' ? getDecisionColor(r.decision) : 'text-[#657582] dark:text-[#A4B2BE]'
                                 const isCurrent = r.id === selectedReport.id
                                 return (
                                     <button
                                         key={r.id}
                                         onClick={() => !isCurrent && handleSelectReport(r)}
-                                        className={`flex flex-col items-center gap-1 shrink-0 px-2 py-1.5 rounded-lg transition-colors ${isCurrent ? 'bg-blue-50 dark:bg-blue-500/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                                        aria-current={isCurrent ? "true" : undefined}
+                                        className={`flex min-h-16 shrink-0 flex-col items-start justify-center gap-1 rounded border px-3 py-2 transition-colors ${isCurrent ? 'border-[#172D40] bg-[#F4F6F8] dark:border-[#A4B2BE] dark:bg-[#1D303E]' : 'border-[#DFE5E9] hover:bg-[#F4F6F8] dark:border-[#31424F] dark:hover:bg-[#1D303E]'}`}
                                     >
-                                        <div className={`w-3 h-3 rounded-full ${color}`} />
+                                        <span className={`text-sm font-medium ${color}`}>{label}</span>
                                         <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{r.trade_date}</span>
-                                        {r.confidence != null && <span className="text-xs text-slate-400">{r.confidence}%</span>}
                                     </button>
                                 )
                             })}
@@ -494,12 +337,13 @@ export default function Reports() {
                         <DecisionCard
                             symbol={selectedReport.symbol}
                             name={selectedReport.name}
+                            report={selectedReport.result_data}
                             decision={action}
                             direction={selectedReport.direction}
                             confidence={selectedReport.confidence ?? undefined}
                             targetPrice={selectedReport.target_price ?? undefined}
                             stopLoss={selectedReport.stop_loss_price ?? undefined}
-                            reasoning={selectedReport.final_trade_decision?.slice(0, 300) ?? undefined}
+                            reasoning={selectedReport.final_trade_decision ?? undefined}
                         />
                     ) : selectedReport.status === 'failed' ? (
                         <div className="card h-full flex flex-col items-center justify-center p-8 text-center min-h-[320px]">
@@ -507,8 +351,8 @@ export default function Reports() {
                                 <Trash2 className="h-6 w-6" />
                             </div>
                             <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">分析失败</h3>
-                            <p className="mt-2 max-w-[240px] text-sm text-slate-500">
-                                {selectedReport.error?.slice(0, 80) || '未知错误'}
+                            <p className="mt-2 max-w-full break-words text-sm leading-6 text-[#657582] dark:text-[#A4B2BE]">
+                                {selectedReport.error || '未知错误'}
                             </p>
                         </div>
                     ) : (
@@ -530,9 +374,9 @@ export default function Reports() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">历史报告</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">
-                        {user?.email ? `${user.email} 的私有分析记录 · 共 ${total} 份` : `共 ${total} 份分析报告`}
+                    <h1 className="text-2xl font-semibold text-[#243746] dark:text-[#E8EDF1]">研究报告</h1>
+                    <p className="mt-2 text-sm text-[#657582] dark:text-[#A4B2BE]">
+                        {user?.email ? `${user.email} · 共 ${total} 份研究记录` : `共 ${total} 份研究记录`}
                     </p>
                 </div>
             </div>
@@ -546,7 +390,8 @@ export default function Reports() {
                             type="text"
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            placeholder="搜索股票代码或名称..."
+                            aria-label="搜索当前页报告的股票代码或名称"
+                            placeholder="搜索当前页代码或名称"
                             className="input w-full pl-10"
                         />
                     </div>
@@ -558,7 +403,7 @@ export default function Reports() {
             {loading && (
                 <div className="card py-12">
                     <div className="flex flex-col items-center gap-4">
-                        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                        <Loader2 className="w-8 h-8 text-[#172D40] dark:text-[#A4B2BE] animate-spin" />
                         <p className="text-slate-500">加载报告中...</p>
                     </div>
                 </div>
@@ -570,7 +415,7 @@ export default function Reports() {
                     <p className="text-red-500 mb-4">{error}</p>
                     <button
                         onClick={() => fetchReports(page)}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                        className="btn-primary min-h-11"
                     >
                         重试
                     </button>
@@ -579,31 +424,28 @@ export default function Reports() {
 
             {/* 报告表格 */}
             {!loading && !error && (
-                <div className="card overflow-hidden">
+                <div className="card overflow-hidden !p-0">
                     <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="border-b border-slate-200 dark:border-slate-700">
-                                    {['股票', '分析日期', '决策建议', '置信度', '目标价/止损价', '生成时间', '操作'].map(h => (
-                                        <th key={h} className={`py-3 px-4 text-sm font-medium text-slate-500 dark:text-slate-400 ${h === '操作' ? 'text-right' : 'text-left'}`}>
+                        <table className="w-full min-w-[920px] text-sm">
+                            <thead className="bg-[#F4F6F8] dark:bg-[#111B24]">
+                                <tr className="border-b border-[#DFE5E9] dark:border-[#31424F]">
+                                    {['标的', '研究日期', '研究建议 / 状态', '模型自评', '目标价 / 止损价', '记录创建时间', '操作'].map(h => (
+                                        <th scope="col" key={h} className={`whitespace-nowrap px-4 py-3.5 text-xs font-medium text-[#657582] dark:text-[#A4B2BE] ${['操作', '模型自评', '目标价 / 止损价'].includes(h) ? 'text-right' : 'text-left'}`}>
                                             {h}
                                         </th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                            <tbody className="divide-y divide-[#DFE5E9] dark:divide-[#31424F]">
                                 {filteredReports.map((report) => {
                                     return (
                                         <tr
                                             key={report.id}
-                                            className="transition-colors cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                                            className="cursor-pointer transition-colors hover:bg-[#F4F6F8] dark:hover:bg-[#1D303E]"
                                             onClick={() => handleSelectReport(report)}
                                         >
                                             <td className="py-3 px-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center">
-                                                        <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                                    </div>
                                                     <div>
                                                         <p className="font-medium text-slate-900 dark:text-slate-100">{report.name || report.symbol}</p>
                                                         {report.name && report.name !== report.symbol && (
@@ -612,45 +454,35 @@ export default function Reports() {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{report.trade_date}</td>
+                                            <td className="whitespace-nowrap px-4 py-4 text-[#657582] tabular-nums dark:text-[#A4B2BE]">{report.trade_date}</td>
                                             <td className="py-3 px-4">
                                                 {renderStatusBadge(report)}
                                             </td>
-                                            <td className="py-3 px-4">
-                                                {report.confidence != null ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-16 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full bg-blue-500 rounded-full"
-                                                                style={{ width: `${report.confidence}%` }}
-                                                            />
-                                                        </div>
-                                                        <span className="text-sm text-slate-600 dark:text-slate-400">{report.confidence}%</span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-slate-400">-</span>
-                                                )}
+                                            <td className="px-4 py-4 text-right tabular-nums text-[#657582] dark:text-[#A4B2BE]">
+                                                {report.confidence != null ? `${report.confidence}%` : '—'}
                                             </td>
-                                            <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">
-                                                {report.target_price != null ? `¥${report.target_price}` : '-'} / {report.stop_loss_price != null ? `¥${report.stop_loss_price}` : '-'}
+                                            <td className="whitespace-nowrap px-4 py-4 text-right tabular-nums text-[#243746] dark:text-[#E8EDF1]">
+                                                {report.target_price != null ? report.target_price : '—'} / {report.stop_loss_price != null ? report.stop_loss_price : '—'}
                                             </td>
-                                            <td className="py-3 px-4 text-sm text-slate-500 dark:text-slate-400">
-                                                {report.created_at ? new Date(report.created_at).toLocaleString('zh-CN') : '-'}
+                                            <td className="whitespace-nowrap px-4 py-4 tabular-nums text-[#657582] dark:text-[#A4B2BE]">
+                                                {report.created_at ? new Date(report.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                                             </td>
                                             <td className="py-3 px-4">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
-                                                        className="p-2 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                                        className="flex h-11 w-11 items-center justify-center rounded text-[#657582] transition-colors hover:bg-[#DFE5E9] hover:text-[#172D40] dark:text-[#A4B2BE] dark:hover:bg-[#31424F] dark:hover:text-[#E8EDF1]"
                                                         onClick={e => { e.stopPropagation(); handleSelectReport(report) }}
                                                         title="查看详情"
+                                                        aria-label={`查看 ${report.name || report.symbol} 的研究报告`}
                                                     >
                                                         <FileText className="w-4 h-4" />
                                                     </button>
                                                     <button
-                                                        className="p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+                                                        className="flex h-11 w-11 items-center justify-center rounded text-[#657582] transition-colors hover:bg-[#FBF2F1] hover:text-[#AF423F] disabled:opacity-50 dark:text-[#A4B2BE] dark:hover:bg-[#372827] dark:hover:text-[#E1A3A0]"
                                                         onClick={e => handleDelete(e, report.id)}
                                                         disabled={deleting === report.id}
                                                         title="删除"
+                                                        aria-label={`删除 ${report.name || report.symbol} 的研究报告`}
                                                     >
                                                         {deleting === report.id
                                                             ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -678,6 +510,8 @@ export default function Reports() {
                         </div>
                     )}
 
+                    <p className="border-t border-[#DFE5E9] px-4 py-3 text-xs leading-6 text-[#657582] dark:border-[#31424F] dark:text-[#A4B2BE]">模型自评为原报告输出，并非经过校准的成功概率。目标价、止损价的币种与适用条件请查阅原报告。</p>
+
                     {/* Pagination */}
                     {totalPages > 1 && (
                         <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 dark:border-slate-700">
@@ -686,16 +520,18 @@ export default function Reports() {
                             </span>
                             <div className="flex items-center gap-2">
                                 <button
+                                    aria-label="上一页"
                                     onClick={() => setPage(p => p - 1)}
                                     disabled={page === 0}
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    className="flex h-11 w-11 items-center justify-center rounded text-[#657582] hover:bg-[#F4F6F8] disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#A4B2BE] dark:hover:bg-[#1D303E]"
                                 >
                                     <ChevronLeft className="w-4 h-4" />
                                 </button>
                                 <button
+                                    aria-label="下一页"
                                     onClick={() => setPage(p => p + 1)}
                                     disabled={page >= totalPages - 1}
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    className="flex h-11 w-11 items-center justify-center rounded text-[#657582] hover:bg-[#F4F6F8] disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#A4B2BE] dark:hover:bg-[#1D303E]"
                                 >
                                     <ChevronRight className="w-4 h-4" />
                                 </button>

@@ -1,9 +1,9 @@
-import { useState } from 'react'
-import { TrendingUp, TrendingDown, Target, Shield, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { Shield, FileText } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AnalysisReport } from '@/types'
-import { sanitizeReportMarkdown } from '@/utils/reportText'
+import { extractVerdict, sanitizeReportMarkdown } from '@/utils/reportText'
+import { getResearchExcerpt } from '@/utils/researchView'
 
 interface DecisionCardProps {
     symbol: string
@@ -18,166 +18,76 @@ interface DecisionCardProps {
     reasoning?: string
     riskLevel?: 'low' | 'medium' | 'high'
     report?: AnalysisReport
+    onReadReport?: () => void
+    compact?: boolean
 }
 
-const decisionConfig: Record<string, { label: string; color: string; icon: typeof TrendingUp }> = {
-    buy: { label: '买入', color: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/30', icon: TrendingUp },
-    sell: { label: '卖出', color: 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-500/30', icon: TrendingDown },
-    hold: { label: '持有', color: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/30', icon: Shield },
-    add: { label: '增持', color: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/30', icon: TrendingUp },
-    reduce: { label: '减持', color: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/30', icon: TrendingDown },
-    watch: { label: '观望', color: 'bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-400 border-slate-200 dark:border-slate-600', icon: Info },
+const ACTION_LABELS: Record<string, string> = {
+    BUY: '买入', SELL: '卖出', HOLD: '持有', ADD: '增持', REDUCE: '减持', WATCH: '观望',
+    买入: '买入', 卖出: '卖出', 持有: '持有', 增持: '增持', 减持: '减持', 观望: '观望',
 }
+const DIRECTION_LABELS: Record<string, string> = {
+    BULLISH: '看多', LEAN_BULLISH: '偏多', BEARISH: '看空', LEAN_BEARISH: '偏空', NEUTRAL: '中性', CAUTIOUS: '谨慎',
+}
+const RISK_LABELS: Record<string, string> = { pass: '已通过', revise: '需修订', reject: '不通过' }
 
-export default function DecisionCard({
-    symbol,
-    name = symbol,
-    decision: propDecision,
-    direction,
-    confidence,
-    targetPrice,
-    targetChange,
-    stopLoss,
-    stopLossChange,
-    reasoning,
-    riskLevel,
-    report,
-}: DecisionCardProps) {
-    const [expanded, setExpanded] = useState(false)
+export default function DecisionCard({ symbol, name, decision, direction, confidence, targetPrice, targetChange, stopLoss, stopLossChange, reasoning, riskLevel, report, compact = false, onReadReport }: DecisionCardProps) {
+    const sourceText = sanitizeReportMarkdown(report?.final_trade_decision || reasoning)
+    const rawDirection = direction || report?.direction || extractVerdict(report?.final_trade_decision)?.direction
+    const researchDirection = rawDirection ? (DIRECTION_LABELS[rawDirection.toUpperCase()] || rawDirection) : '未提供'
+    const action = ACTION_LABELS[(decision || report?.decision || '').trim().toUpperCase()]
+    const feedback = report?.risk_feedback_state
+    const riskVerdict = feedback?.latest_risk_verdict?.toLowerCase()
+    const riskStatus = riskVerdict ? (RISK_LABELS[riskVerdict] || '无法确认') : '风控状态未提供'
+    const riskRequiresAttention = riskVerdict === 'reject' || riskVerdict === 'revise'
+    const currency = report?.instrument_context?.currency
+    const selfRating = confidence != null && Number.isFinite(confidence) && confidence >= 0 && confidence <= 100 ? confidence : undefined
 
-    const parseDecision = (text?: string): 'buy' | 'sell' | 'hold' | 'add' | 'reduce' | 'watch' | undefined => {
-        if (!text) return propDecision
-        const lower = text.toLowerCase()
-        if (lower.includes('sell') || lower.includes('卖出')) return 'sell'
-        if (lower.includes('reduce') || lower.includes('减持')) return 'reduce'
-        if (lower.includes('watch') || lower.includes('观望')) return 'watch'
-        if (lower.includes('hold') || lower.includes('持有')) return 'hold'
-        if (lower.includes('add') || lower.includes('增持')) return 'add'
-        if (lower.includes('buy') || lower.includes('买入')) return 'buy'
-        return undefined
-    }
-
-    const decision = propDecision || parseDecision(report?.decision || report?.final_trade_decision)
-    const config = decision ? (decisionConfig[decision] || decisionConfig.hold) : null
-    const DecisionIcon = config?.icon
-
-    const riskLabels: Record<string, string> = { low: '低', medium: '中等', high: '高' }
-    const riskColors: Record<string, string> = {
-        low: 'text-green-600 dark:text-green-400',
-        medium: 'text-yellow-600 dark:text-yellow-400',
-        high: 'text-red-600 dark:text-red-400',
-    }
+    const modelLabel = report?.profile_name || report?.model_name || (report?.result_data as Record<string, any> | undefined)?.profile_name || (report?.result_data as Record<string, any> | undefined)?.model_name
 
     return (
-        <div className="card overflow-hidden">
-            {/* 头部 */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
-                        <TrendingUp className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">{name}</h3>
-                        <p className="text-sm text-slate-500">{symbol}</p>
-                        {direction && (
-                            <p className="text-xs text-slate-400 mt-0.5">方向：{direction}</p>
+        <section className="min-w-0 rounded-lg border border-[#DFE5E9] bg-white p-5 text-[#243746] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:p-6">
+            <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <h3 className="text-base font-semibold text-[#172D40] dark:text-slate-100">关键研判</h3>
+                        {modelLabel && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
+                                🤖 {modelLabel}
+                            </span>
                         )}
                     </div>
+                    {!compact && <p className="mt-1 text-xs text-[#657582] dark:text-slate-400">{name || report?.instrument_context?.security_name || symbol}{name && name !== symbol ? ` · ${symbol}` : ''}</p>}
                 </div>
-                {config && DecisionIcon ? (
-                    <div className={`px-4 py-2 rounded-full border font-medium flex items-center gap-1.5 ${config.color}`}>
-                        <DecisionIcon className="w-4 h-4" />
-                        {config.label}
-                    </div>
-                ) : (
-                    <div className="px-4 py-2 rounded-full border font-medium text-slate-400 border-slate-200 dark:border-slate-700">
-                        等待裁决
-                    </div>
-                )}
-            </div>
+                {selfRating != null && <div className="text-right text-xs leading-5 text-[#657582] dark:text-slate-400"><p>模型自评 <span className="tabular-nums font-medium">{selfRating}%</span></p><p className="text-[11px]">未经历史结果校准</p></div>}
+            </header>
 
-            {/* 置信度 */}
-            {confidence != null && (
-                <div className="mb-4">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-slate-500">置信度</span>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{confidence}%</span>
-                    </div>
-                    <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                        <div
-                            className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-1000"
-                            style={{ width: `${confidence}%` }}
-                        />
-                    </div>
+            <dl className="grid grid-cols-1 gap-4 border-y border-[#DFE5E9] py-4 dark:border-slate-700 min-[460px]:grid-cols-3">
+                <div><dt className="mb-1 text-xs text-[#657582] dark:text-slate-400">研究方向</dt><dd className={`text-base font-semibold ${/看多|偏多/.test(researchDirection) ? 'text-[#AF423F] dark:text-red-300' : /看空|偏空/.test(researchDirection) ? 'text-[#287461] dark:text-emerald-300' : 'text-[#172D40] dark:text-slate-100'}`}>{researchDirection}</dd></div>
+                <div><dt className="mb-1 text-xs text-[#657582] dark:text-slate-400">建议动作</dt><dd className="text-base font-semibold text-[#172D40] dark:text-slate-100">{action || '未形成建议'}</dd></div>
+                <div><dt className="mb-1 text-xs text-[#657582] dark:text-slate-400">风控状态</dt><dd className={`text-sm font-medium ${riskRequiresAttention ? 'text-[#AF423F] dark:text-red-300' : 'text-[#243746] dark:text-slate-200'}`}>{riskStatus}</dd>{riskVerdict && <p className="mt-1 text-[11px] text-[#657582] dark:text-slate-400">模型裁决</p>}</div>
+            </dl>
+
+            {feedback && (feedback.revision_reason || feedback.hard_constraints?.length > 0 || feedback.execution_preconditions?.length > 0) && (
+                <div className="mt-4 border-l-2 border-[#92764E] bg-[#F8FAFB] px-3 py-3 text-sm leading-6 dark:bg-slate-800/60">
+                    <p className="mb-1 flex items-center gap-1.5 font-medium"><Shield className="h-3.5 w-3.5" />适用条件与限制</p>
+                    {feedback.revision_reason && <p>{feedback.revision_reason}</p>}
+                    {feedback.hard_constraints?.length > 0 && <ul className="list-disc space-y-1 pl-4">{feedback.hard_constraints.map((item, i) => <li key={`hard-${i}`}>{item}</li>)}</ul>}
+                    {feedback.execution_preconditions?.length > 0 && <ul className="mt-1 list-disc space-y-1 pl-4">{feedback.execution_preconditions.map((item, i) => <li key={`condition-${i}`}>{item}</li>)}</ul>}
                 </div>
             )}
 
-            {/* 目标价和止损价 */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20">
-                    <div className="flex items-center gap-1.5 mb-1">
-                        <Target className="w-4 h-4 text-red-600 dark:text-red-400" />
-                        <span className="text-xs text-slate-500">目标价</span>
-                    </div>
-                    <p className="text-xl font-bold text-red-600 dark:text-red-400">
-                        {targetPrice != null ? `¥${targetPrice}` : '--'}
-                    </p>
-                    {targetChange != null && (
-                        <p className="text-sm text-red-600 dark:text-red-400">
-                            {targetChange >= 0 ? '+' : ''}{targetChange.toFixed(1)}%
-                        </p>
-                    )}
-                </div>
-                <div className="p-3 rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-100 dark:border-green-500/20">
-                    <div className="flex items-center gap-1.5 mb-1">
-                        <Shield className="w-4 h-4 text-green-600 dark:text-green-400" />
-                        <span className="text-xs text-slate-500">止损价</span>
-                    </div>
-                    <p className="text-xl font-bold text-green-600 dark:text-green-400">
-                        {stopLoss != null ? `¥${stopLoss}` : '--'}
-                    </p>
-                    {stopLossChange != null && (
-                        <p className="text-sm text-green-600 dark:text-green-400">
-                            {stopLossChange >= 0 ? '+' : ''}{stopLossChange.toFixed(1)}%
-                        </p>
-                    )}
-                </div>
+            <div className="mt-5">
+                <p className="mb-2 flex items-center gap-1.5 text-xs text-[#657582] dark:text-slate-400"><FileText className="h-3.5 w-3.5" />来源：研究结论原文</p>
+                {sourceText && compact ? <p className="text-sm leading-7">{getResearchExcerpt(sourceText.replace(/^#{1,6}[^\n]*(?:\n|$)/gm, '').trim().split(/\n\s*\n/)[0], 220)}</p> : sourceText ? <div tabIndex={0} aria-label="研究结论原文，可滚动阅读全文" className="prose max-h-64 max-w-none overflow-auto break-words pr-1 text-sm leading-7 dark:prose-invert [&_table]:block [&_table]:overflow-x-auto"><ReactMarkdown remarkPlugins={[remarkGfm]}>{sourceText}</ReactMarkdown></div> : <p className="py-3 text-sm leading-6 text-[#657582] dark:text-slate-400">结论尚未提供，已生成的依据可在完整报告中阅读。</p>}
             </div>
 
-            {/* 展开详情 */}
-            {expanded && (reasoning || riskLevel) && (
-                <div className="mb-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 space-y-2">
-                    {reasoning && (
-                        <div>
-                            <span className="text-sm text-slate-500">核心逻辑</span>
-                            <div className="mt-1 prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-300">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                    {sanitizeReportMarkdown(reasoning)}
-                                </ReactMarkdown>
-                            </div>
-                        </div>
-                    )}
-                    {riskLevel && (
-                        <div className="flex justify-between">
-                            <span className="text-sm text-slate-500">风险等级</span>
-                            <span className={`text-sm font-medium ${riskColors[riskLevel]}`}>{riskLabels[riskLevel]}</span>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* 操作按钮 */}
-            <div className="flex flex-wrap gap-2">
-                {(reasoning || riskLevel) && (
-                    <button
-                        onClick={() => setExpanded(!expanded)}
-                        className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                    >
-                        {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        {expanded ? '收起' : '详情'}
-                    </button>
-                )}
-            </div>
-        </div>
+            {compact && onReadReport && <button type="button" onClick={onReadReport} className="mt-3 text-xs text-slate-500 underline underline-offset-4">阅读全文与执行条件</button>}
+            <dl className="mt-5 grid grid-cols-2 gap-5 border-t border-[#DFE5E9] pt-4 dark:border-slate-700">
+                <div><dt className="text-xs text-[#657582] dark:text-slate-400">报告目标价{currency ? ` · ${currency}` : ''}</dt><dd className="mt-1 text-xl font-medium tabular-nums">{targetPrice != null ? targetPrice.toLocaleString('zh-CN', { maximumFractionDigits: 2 }) : '—'}</dd>{targetChange != null && <p className="text-xs tabular-nums text-[#657582] dark:text-slate-400">{targetChange >= 0 ? '+' : ''}{targetChange.toFixed(1)}%</p>}</div>
+                <div><dt className="text-xs text-[#657582] dark:text-slate-400">报告止损价{currency ? ` · ${currency}` : ''}</dt><dd className="mt-1 text-xl font-medium tabular-nums">{stopLoss != null ? stopLoss.toLocaleString('zh-CN', { maximumFractionDigits: 2 }) : '—'}</dd>{stopLossChange != null && <p className="text-xs tabular-nums text-[#657582] dark:text-slate-400">{stopLossChange >= 0 ? '+' : ''}{stopLossChange.toFixed(1)}%</p>}</div>
+            </dl>
+            {riskLevel && <p className="mt-3 text-xs text-[#657582] dark:text-slate-400">报告风险等级：{{ low: '低', medium: '中', high: '高' }[riskLevel]}</p>}
+        </section>
     )
 }

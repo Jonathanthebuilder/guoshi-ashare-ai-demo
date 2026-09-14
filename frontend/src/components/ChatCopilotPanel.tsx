@@ -1,14 +1,15 @@
 import { FormEvent, useState, useRef, useEffect } from 'react'
 import {
-    Bot, Loader2, Send, Sparkles, FileText, ChevronRight, Trash2,
+    BookOpen, Loader2, Send, FileText, ChevronRight, Trash2,
     TrendingUp, MessageCircle, Newspaper, Calculator, BarChart2, DollarSign,
     ArrowBigUp, ArrowBigDown, Brain, Briefcase, Flame, Scale, Shield, CheckCircle2,
-    Activity,
+    Activity, Sparkles,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { api } from '@/services/api'
 import { useAnalysisStore } from '@/stores/analysisStore'
+import { reconcileResearchDraft } from '@/utils/researchView'
 import {
     classifyRecoveredJobStatus,
     DEFAULT_OVERTIME_NOTICE,
@@ -39,7 +40,7 @@ interface StreamEvent {
 const PRESET_PROMPTS = [
     '调研贵州茅台(600519)短线',
     '分析宁德时代(300750)中线',
-    '调研稀土ETF嘉实(516150)短线',
+    '调研比亚迪(002594)短线',
 ]
 
 const REPORT_SECTION_TITLES: Record<string, string> = {
@@ -57,36 +58,36 @@ const REPORT_SECTION_TITLES: Record<string, string> = {
 
 // Section → Lucide 图标 + 颜色（与 AGENT_META_MAP 保持一致）
 const SECTION_META: Record<string, { Icon: React.FC<{ className?: string }>; iconCls: string; bgCls: string }> = {
-    market_report:          { Icon: TrendingUp,    iconCls: 'text-blue-500',    bgCls: 'bg-blue-100 dark:bg-blue-500/20' },
-    sentiment_report:       { Icon: MessageCircle, iconCls: 'text-fuchsia-500', bgCls: 'bg-fuchsia-100 dark:bg-fuchsia-500/20' },
-    news_report:            { Icon: Newspaper,     iconCls: 'text-cyan-500',    bgCls: 'bg-cyan-100 dark:bg-cyan-500/20' },
-    fundamentals_report:    { Icon: Calculator,    iconCls: 'text-emerald-500', bgCls: 'bg-emerald-100 dark:bg-emerald-500/20' },
-    macro_report:           { Icon: BarChart2,     iconCls: 'text-violet-500',  bgCls: 'bg-violet-100 dark:bg-violet-500/20' },
-    smart_money_report:     { Icon: DollarSign,    iconCls: 'text-amber-500',   bgCls: 'bg-amber-100 dark:bg-amber-500/20' },
-    volume_price_report:    { Icon: Activity,      iconCls: 'text-rose-500',    bgCls: 'bg-rose-100 dark:bg-rose-500/20' },
-    investment_plan:        { Icon: Brain,         iconCls: 'text-indigo-500',  bgCls: 'bg-indigo-100 dark:bg-indigo-500/20' },
-    trader_investment_plan: { Icon: Briefcase,     iconCls: 'text-orange-500',  bgCls: 'bg-orange-100 dark:bg-orange-500/20' },
-    final_trade_decision:   { Icon: CheckCircle2,  iconCls: 'text-teal-500',    bgCls: 'bg-teal-100 dark:bg-teal-500/20' },
+    market_report:          { Icon: TrendingUp,    iconCls: 'text-slate-500 dark:text-slate-300',    bgCls: 'bg-slate-100 dark:bg-slate-700/60' },
+    sentiment_report:       { Icon: MessageCircle, iconCls: 'text-slate-500 dark:text-slate-300', bgCls: 'bg-slate-100 dark:bg-slate-700/60' },
+    news_report:            { Icon: Newspaper,     iconCls: 'text-slate-500 dark:text-slate-300',    bgCls: 'bg-slate-100 dark:bg-slate-700/60' },
+    fundamentals_report:    { Icon: Calculator,    iconCls: 'text-slate-500 dark:text-slate-300', bgCls: 'bg-slate-100 dark:bg-slate-700/60' },
+    macro_report:           { Icon: BarChart2,     iconCls: 'text-slate-500 dark:text-slate-300',  bgCls: 'bg-slate-100 dark:bg-slate-700/60' },
+    smart_money_report:     { Icon: DollarSign,    iconCls: 'text-slate-500 dark:text-slate-300',   bgCls: 'bg-slate-100 dark:bg-slate-700/60' },
+    volume_price_report:    { Icon: Activity,      iconCls: 'text-slate-500 dark:text-slate-300',    bgCls: 'bg-slate-100 dark:bg-slate-700/60' },
+    investment_plan:        { Icon: Brain,         iconCls: 'text-slate-500 dark:text-slate-300',  bgCls: 'bg-slate-100 dark:bg-slate-700/60' },
+    trader_investment_plan: { Icon: Briefcase,     iconCls: 'text-slate-500 dark:text-slate-300',  bgCls: 'bg-slate-100 dark:bg-slate-700/60' },
+    final_trade_decision:   { Icon: CheckCircle2,  iconCls: 'text-slate-500 dark:text-slate-300',    bgCls: 'bg-slate-100 dark:bg-slate-700/60' },
 }
 
 // 与 AgentCollaboration.tsx 保持一致的图标 + 颜色体系
 const AGENT_META_MAP: Record<string, { Icon: React.FC<{ className?: string }>; iconCls: string; bgCls: string; label: string }> = {
-    'Market Analyst':       { Icon: TrendingUp,   iconCls: 'text-blue-500',    bgCls: 'bg-blue-100 dark:bg-blue-500/20',    label: '技术面' },
-    'Social Analyst':       { Icon: MessageCircle, iconCls: 'text-fuchsia-500', bgCls: 'bg-fuchsia-100 dark:bg-fuchsia-500/20', label: '舆情' },
-    'News Analyst':         { Icon: Newspaper,     iconCls: 'text-cyan-500',    bgCls: 'bg-cyan-100 dark:bg-cyan-500/20',    label: '新闻' },
-    'Fundamentals Analyst': { Icon: Calculator,    iconCls: 'text-emerald-500', bgCls: 'bg-emerald-100 dark:bg-emerald-500/20', label: '基本面' },
-    'Macro Analyst':        { Icon: BarChart2,     iconCls: 'text-violet-500',  bgCls: 'bg-violet-100 dark:bg-violet-500/20', label: '宏观' },
-    'Smart Money Analyst':  { Icon: DollarSign,    iconCls: 'text-amber-500',   bgCls: 'bg-amber-100 dark:bg-amber-500/20',  label: '主力资金' },
-    'Volume Price Analyst': { Icon: Activity,      iconCls: 'text-rose-500',    bgCls: 'bg-rose-100 dark:bg-rose-500/20',    label: '量价' },
-    'Bull Researcher':      { Icon: ArrowBigUp,    iconCls: 'text-emerald-500', bgCls: 'bg-emerald-100 dark:bg-emerald-500/20', label: '多头' },
-    'Bear Researcher':      { Icon: ArrowBigDown,  iconCls: 'text-rose-500',    bgCls: 'bg-rose-100 dark:bg-rose-500/20',    label: '空头' },
-    'Research Manager':     { Icon: Brain,         iconCls: 'text-indigo-500',  bgCls: 'bg-indigo-100 dark:bg-indigo-500/20', label: '研究总监' },
-    'Trader':               { Icon: Briefcase,     iconCls: 'text-orange-500',  bgCls: 'bg-orange-100 dark:bg-orange-500/20', label: '交易员' },
-    'Aggressive Analyst':   { Icon: Flame,         iconCls: 'text-red-500',     bgCls: 'bg-red-100 dark:bg-red-500/20',      label: '激进' },
-    'Neutral Analyst':      { Icon: Scale,         iconCls: 'text-slate-500',   bgCls: 'bg-slate-100 dark:bg-slate-500/20',  label: '中性' },
-    'Conservative Analyst': { Icon: Shield,        iconCls: 'text-amber-500',   bgCls: 'bg-amber-100 dark:bg-amber-500/20',  label: '稳健' },
-    'Portfolio Manager':    { Icon: CheckCircle2,  iconCls: 'text-teal-500',    bgCls: 'bg-teal-100 dark:bg-teal-500/20',    label: '组合经理' },
-    '意图解析':             { Icon: Bot,            iconCls: 'text-slate-400',   bgCls: 'bg-slate-100 dark:bg-slate-700',     label: '意图解析' },
+    'Market Analyst':       { Icon: TrendingUp,   iconCls: 'text-slate-500 dark:text-slate-300',    bgCls: 'bg-slate-100 dark:bg-slate-700/60',    label: '技术面' },
+    'Social Analyst':       { Icon: MessageCircle, iconCls: 'text-slate-500 dark:text-slate-300', bgCls: 'bg-slate-100 dark:bg-slate-700/60', label: '舆情' },
+    'News Analyst':         { Icon: Newspaper,     iconCls: 'text-slate-500 dark:text-slate-300',    bgCls: 'bg-slate-100 dark:bg-slate-700/60',    label: '新闻' },
+    'Fundamentals Analyst': { Icon: Calculator,    iconCls: 'text-slate-500 dark:text-slate-300', bgCls: 'bg-slate-100 dark:bg-slate-700/60', label: '基本面' },
+    'Macro Analyst':        { Icon: BarChart2,     iconCls: 'text-slate-500 dark:text-slate-300',  bgCls: 'bg-slate-100 dark:bg-slate-700/60', label: '宏观' },
+    'Smart Money Analyst':  { Icon: DollarSign,    iconCls: 'text-slate-500 dark:text-slate-300',   bgCls: 'bg-slate-100 dark:bg-slate-700/60',  label: '主力资金' },
+    'Volume Price Analyst': { Icon: Activity,      iconCls: 'text-slate-500 dark:text-slate-300',    bgCls: 'bg-slate-100 dark:bg-slate-700/60',    label: '量价' },
+    'Bull Researcher':      { Icon: ArrowBigUp,    iconCls: 'text-slate-500 dark:text-slate-300', bgCls: 'bg-slate-100 dark:bg-slate-700/60', label: '多头' },
+    'Bear Researcher':      { Icon: ArrowBigDown,  iconCls: 'text-slate-500 dark:text-slate-300',    bgCls: 'bg-slate-100 dark:bg-slate-700/60',    label: '空头' },
+    'Research Manager':     { Icon: Brain,         iconCls: 'text-slate-500 dark:text-slate-300',  bgCls: 'bg-slate-100 dark:bg-slate-700/60', label: '研究总监' },
+    'Trader':               { Icon: Briefcase,     iconCls: 'text-slate-500 dark:text-slate-300',  bgCls: 'bg-slate-100 dark:bg-slate-700/60', label: '交易员' },
+    'Aggressive Analyst':   { Icon: Flame,         iconCls: 'text-slate-500 dark:text-slate-300',     bgCls: 'bg-slate-100 dark:bg-slate-700/60',      label: '激进' },
+    'Neutral Analyst':      { Icon: Scale,         iconCls: 'text-slate-500 dark:text-slate-300',   bgCls: 'bg-slate-100 dark:bg-slate-700/60',  label: '中性' },
+    'Conservative Analyst': { Icon: Shield,        iconCls: 'text-slate-500 dark:text-slate-300',   bgCls: 'bg-slate-100 dark:bg-slate-700/60',  label: '稳健' },
+    'Portfolio Manager':    { Icon: CheckCircle2,  iconCls: 'text-slate-500 dark:text-slate-300',    bgCls: 'bg-slate-100 dark:bg-slate-700/60',    label: '组合经理' },
+    '意图解析':             { Icon: BookOpen,            iconCls: 'text-slate-500 dark:text-slate-300',   bgCls: 'bg-slate-100 dark:bg-slate-700/60',     label: '意图解析' },
 }
 
 function ReportCard({
@@ -110,11 +111,11 @@ function ReportCard({
 
     if (streaming) {
         return (
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-sm">
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
                 <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg ${bgCls} shrink-0`}>
                     <IconEl className={`w-4 h-4 ${iconCls}`} />
                 </span>
-                <span className="text-blue-300 font-medium text-xs">{title}</span>
+                <span className="text-slate-500 dark:text-slate-300 font-medium text-xs">{title}</span>
                 <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0 ml-auto" />
             </div>
         )
@@ -123,13 +124,13 @@ function ReportCard({
     return (
         <button
             onClick={onOpen}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 hover:border-blue-400 dark:hover:border-blue-500/40 hover:bg-blue-50 dark:hover:bg-slate-800 transition-all text-left group"
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 hover:border-blue-400 dark:hover:border-blue-500/40 hover:bg-blue-50 dark:hover:bg-slate-800 transition-all text-left group"
         >
             <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg ${bgCls} shrink-0`}>
                 <IconEl className={`w-4 h-4 ${iconCls}`} />
             </span>
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">{title}</p>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-slate-500 dark:text-slate-300 transition-colors">{title}</p>
                 <p className="text-xs text-slate-500 truncate mt-0.5">{preview}...</p>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 shrink-0 transition-colors" />
@@ -139,7 +140,26 @@ function ReportCard({
 
 export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initialInput }: ChatCopilotPanelProps) {
     const [input, setInput] = useState(initialInput || '')
+    const [previousPrefill, setPreviousPrefill] = useState(initialInput)
+    if (initialInput !== previousPrefill) {
+        setPreviousPrefill(initialInput)
+        setInput(reconcileResearchDraft(input, previousPrefill, initialInput))
+    }
     const [streaming, setStreaming] = useState(false)
+    const [selectedProfileId, setSelectedProfileId] = useState<string>('')
+
+    useEffect(() => {
+        api.getLLMProfiles().then((profs) => {
+            if (Array.isArray(profs) && profs.length > 0) {
+                const geminiProf = profs.find(p => (p.backend_url && p.backend_url.includes('43.130')) || (p.deep_think_llm && p.deep_think_llm.includes('gemini')))
+                const def = geminiProf || profs.find((p) => p.is_default) || profs[0]
+                if (def) setSelectedProfileId(def.id)
+            }
+        }).catch((err) => {
+            console.error('Failed to load LLM profiles:', err)
+        })
+    }, [])
+
     // Tracks agent bubbles waiting for their first token (shows "正在推理分析中..." spinner)
     const pendingAgentMsgIdsRef = useRef<Set<string>>(new Set())
     // Only used to trigger re-render when pending status changes
@@ -267,7 +287,7 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
                     forceUpdate(n => n + 1)
                     markAgentMessagesComplete()
                     pushAssistant(
-                        `**分析完成（已从中断连接恢复）**\n\n方向倾向：**${String(result.result.direction || '未知')}**\n\n执行动作：**${String(result.decision || 'HOLD')}**\n\n> 免责声明：以上内容由模型基于公开数据与规则生成，仅供研究参考，不构成任何投资建议或收益承诺。`
+                        `**分析完成（已从中断连接恢复）**\n\n方向倾向：**${String(result.result.direction || '未知')}**\n\n建议动作：**${String(result.decision || '未提供')}**\n\n> 资料来源与日期请以报告各章节列示为准。`
                     )
                     setCurrentHorizon(null)
                     setIsAnalyzing(false)
@@ -406,12 +426,15 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
                     targetPrice: data.target_price as number | null,
                     stopLoss: data.stop_loss_price as number | null,
                 })
+                const modelBadge = (data.profile_name || data.model_name)
+                    ? `\n\n驱动模型：**${String(data.profile_name || data.model_name)}**`
+                    : ''
                 pushAssistant(
-                    `**分析完成**\n\n方向倾向：**${String(data.direction || '未知')}**\n\n执行动作：**${String(data.decision || 'HOLD')}**\n\n> 免责声明：以上内容由模型基于公开数据与规则生成，仅供研究参考，不构成任何投资建议或收益承诺。`
+                    `**分析完成**\n\n方向倾向：**${String(data.direction || '未知')}**\n\n建议动作：**${String(data.decision || '未提供')}**${modelBadge}\n\n> 资料来源与日期请以报告各章节列示为准。`
                 )
                 if ('Notification' in window && Notification.permission === 'granted') {
-                    new Notification('TradingAgents 分析完成', {
-                        body: data.direction ? `方向：${String(data.direction)} · 动作：${String(data.decision || 'HOLD')}` : '点击查看完整报告',
+                    new Notification('老 K 自建投研分析完成', {
+                        body: data.direction ? `方向：${String(data.direction)} · 动作：${String(data.decision || '未提供')}` : '点击查看完整报告',
                         icon: '/favicon.ico',
                     })
                 }
@@ -623,6 +646,7 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
             [{ role: 'user', content: prompt }],
             true,
             selectedAnalysts,
+            selectedProfileId || undefined,
         )
 
         if (!response.body) throw new Error('SSE stream unavailable')
@@ -771,8 +795,8 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
         <aside className="card h-full min-h-0 flex flex-col overflow-hidden">
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                    <Bot className="w-5 h-5 text-cyan-500" />
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">智能分析</h2>
+                    <BookOpen className="w-4 h-4 text-slate-500" />
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">研究助理</h2>
                 </div>
                 <div className="flex items-center gap-2">
                     {onShowReport && hasAnyReport && (
@@ -793,6 +817,7 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
                         disabled={streaming || isAnalyzing}
                         className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-red-100 dark:hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-400 transition-colors flex items-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-100 dark:disabled:hover:bg-slate-700 disabled:hover:text-slate-500"
                         title="清空对话"
+                        aria-label="清空对话与分析结果"
                     >
                         <Trash2 className="w-3 h-3" />
                     </button>
@@ -806,8 +831,7 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
             </div>
 
             <div className="text-xs text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" />
-                课堂快速演示 · 点击下方示例填入输入框
+                说明标的、持有期限与关注问题
             </div>
 
             {/* 快速提示 */}
@@ -867,16 +891,16 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
                             const sym = c.replace('__status:collecting:', '').replace('__', '')
                             label = `已识别 ${sym}，正在采集行情数据...`
                             icon = 'spin'
-                            colorCls = 'bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/30 text-cyan-500 dark:text-cyan-400'
+                            colorCls = 'bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/30 text-slate-500 dark:text-cyan-400'
                         } else if (c === '__status:analyzing__') {
-                            label = '数据就绪，多智能体协作分析启动中...'
+                            label = '资料已就绪，正在展开研究...'
                             icon = 'spin'
                             colorCls = 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-500 dark:text-emerald-400'
                         }
 
                         return (
                             <div key={msg.id} className="flex items-center gap-2">
-                                <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs transition-colors duration-300 ${colorCls}`}>
+                                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs transition-colors duration-300 ${colorCls}`}>
                                     {icon === 'spin' ? (
                                         <>
                                             <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
@@ -912,7 +936,7 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
                         // 已完成的 agent 卡片 → 和 ReportCard 视觉统一
                         if (isCompleted) {
                             return (
-                                <div key={msg.id} className="rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 overflow-hidden transition-all">
+                                <div key={msg.id} className="rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 overflow-hidden transition-all">
                                     <button
                                         onClick={() => setExpandedAgentMsgId(prev => prev === msg.id ? null : msg.id)}
                                         className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:border-blue-400 dark:hover:bg-slate-800 transition-colors group"
@@ -921,7 +945,7 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
                                             <agentMeta.Icon className={`w-4 h-4 ${agentMeta.iconCls}`} />
                                         </span>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">{agentMeta.label}</p>
+                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-slate-500 dark:text-slate-300 transition-colors">{agentMeta.label}</p>
                                             <p className="text-xs text-slate-500 truncate mt-0.5">{preview}...</p>
                                         </div>
                                         <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isExpanded ? 'rotate-90 text-blue-400' : 'text-slate-500 group-hover:text-blue-400'}`} />
@@ -941,7 +965,7 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
 
                         // 进行中的 agent 卡片（pending / streaming）
                         return (
-                            <div key={msg.id} className="rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 transition-all overflow-hidden">
+                            <div key={msg.id} className="rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 transition-all overflow-hidden">
                                 <button
                                     onClick={() => !isPending && setExpandedAgentMsgId(prev => prev === msg.id ? null : msg.id)}
                                     className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700/30 transition-colors"
@@ -952,7 +976,7 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{agentMeta.label}</p>
                                         {isPending ? (
-                                            <p className="text-[11px] text-slate-400 dark:text-slate-500 animate-pulse">正在推理分析中...</p>
+                                            <p className="text-[11px] text-slate-400 dark:text-slate-500">正在推理分析中...</p>
                                         ) : (
                                             <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate" dir="rtl">
                                                 <bdi>{textOnly.slice(-120) || '撰写中...'}</bdi>
@@ -962,7 +986,7 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
                                     {isPending ? (
                                         <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />
                                     ) : (
-                                        <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-medium shrink-0 animate-pulse">撰写中</span>
+                                        <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-medium shrink-0">撰写中</span>
                                     )}
                                 </button>
                                 {isExpanded && !isPending && (
@@ -982,9 +1006,9 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
                     return (
                         <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                             <div
-                                className={`max-w-[92%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
+                                className={`max-w-[92%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
                                     msg.role === 'user'
-                                        ? 'bg-blue-100 dark:bg-blue-500/20 border border-blue-300 dark:border-blue-500/30 text-slate-900 dark:text-slate-100'
+                                        ? 'bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-slate-100'
                                         : msg.role === 'system'
                                             ? 'bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 italic text-xs'
                                             : 'bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
@@ -1025,8 +1049,20 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
                 <div ref={messagesEndRef} />
             </div>
 
+            {/* 模型状态展示（已锁死 Google Gemini 专属算力，客户无需选择，扫码直接用） */}
+            <div className="mt-2.5 flex items-center justify-between gap-2 px-1 text-xs text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-1.5 shrink-0 font-medium text-slate-700 dark:text-slate-300">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                    <span>推演算力:</span>
+                </span>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800/80 text-xs font-semibold text-blue-700 dark:text-blue-300 shadow-xs">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Google Gemini (3.8 Flash) · 独家预置</span>
+                </div>
+            </div>
+
             {/* 输入框 */}
-            <form onSubmit={handleSubmit} className="mt-3 shrink-0">
+            <form onSubmit={handleSubmit} className="mt-2 shrink-0 border-t border-slate-200 pt-3 dark:border-slate-700">
                 <div className="flex items-center gap-2">
                     <input
                         value={input}
@@ -1037,8 +1073,9 @@ export default function ChatCopilotPanel({ onSymbolDetected, onShowReport, initi
                                 handleSubmit(e as unknown as FormEvent)
                             }
                         }}
-                        placeholder="直接描述你的分析需求..."
-                        className="input flex-1"
+                        aria-label="研究需求"
+                        placeholder="输入标的与研究需求"
+                        className="input min-w-0 flex-1"
                         title="Enter 发送，Ctrl+Enter 也可发送"
                     />
                     <button

@@ -2,156 +2,169 @@
 @config "../tailwind.config.js";
 
 @layer base {
-  * {
-    @apply border-slate-200 dark:border-slate-700;
+  :root {
+    --brand-primary: #172d40;
+    --brand-detail: #92764e;
+    --canvas: #f4f6f8;
+    --surface: #ffffff;
+    --text-primary: #243746;
+    --text-secondary: #657582;
+    --border: #dfe5e9;
+    --market-up: #af423f;
+    --market-down: #287461;
+    color-scheme: light;
   }
-
-  html {
-    @apply scroll-smooth;
+  :root.dark {
+    --canvas: #111b24;
+    --surface: #172530;
+    --text-primary: #e8edf1;
+    --text-secondary: #a4b2be;
+    --border: #31424f;
+    --brand-detail: #c0a47c;
+    --market-up: #e28985;
+    --market-down: #75b49f;
+    color-scheme: dark;
   }
-
+  * { border-color: var(--border); }
+  html { scroll-behavior: smooth; }
   body {
-    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
-    font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    margin: 0;
+    background: var(--canvas);
+    color: var(--text-primary);
+    font-family: 'IBM Plex Sans', 'PingFang SC', 'Source Han Sans SC', 'Microsoft YaHei', sans-serif;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
   }
-
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  ::-webkit-scrollbar-track {
-    @apply bg-slate-100 dark:bg-slate-800 rounded;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 dark:bg-slate-600 rounded-full;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400 dark:bg-slate-500;
-  }
+  button:not(:disabled), [role='button']:not([aria-disabled='true']), summary { cursor: pointer; }
+  :focus-visible { outline: 2px solid #5c7b93; outline-offset: 3px; }
+  ::selection { background: #dfe8ef; color: #172d40; }
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #b5c0c9; border-radius: 4px; }
+  .dark ::-webkit-scrollbar-thumb { background: #465866; }
 }
 
-/* 自定义工具类，供 @apply 引用 */
-@utility badge {
-  @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold;
-}
-
-@utility status-dot {
-  @apply w-2.5 h-2.5 rounded-full;
-}
+@utility badge { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium; }
+@utility status-dot { @apply w-2 h-2 rounded-full; }
 
 @layer components {
+  .workspace-shell { min-height: 100vh; background: var(--canvas); color: var(--text-primary); }
+  .workspace-content { min-width: 0; min-height: 100vh; display: flex; flex-direction: column; }
+  .workspace-sidebar { width: 240px; background: #172d40; border-right: 1px solid #263e51; color: #e8edf1; }
+  .workspace-header { background: var(--surface); border-bottom: 1px solid var(--border); }
+  .workspace-panel, .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: none; }
+  .card { padding: 20px; }
+  .card-hover { transition: border-color 150ms, background-color 150ms; }
+  .card-hover:hover { border-color: #97a8b5; }
+  .workspace-page-title { font-size: clamp(24px, 2vw, 28px); font-weight: 600; line-height: 1.35; letter-spacing: -.025em; }
+  .workspace-eyebrow { font-size: 11px; font-weight: 500; letter-spacing: .14em; color: var(--brand-detail); }
+  .workspace-muted { color: var(--text-secondary); }
+  .workspace-menu { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 12px 36px rgb(17 27 36 / 14%); }
+  .workspace-menu-item { @apply flex w-full items-center gap-3 rounded px-3 py-2.5 text-left text-sm transition-colors; color: var(--text-primary); }
+  .workspace-menu-item:hover { background: var(--canvas); }
+  .workspace-icon-button { @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded transition-colors; color: var(--text-secondary); }
+  .workspace-icon-button:hover { background: var(--canvas); color: var(--text-primary); }
+  .btn-primary { @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded text-sm font-medium text-white transition-colors duration-150; background: #172d40; border: 1px solid #172d40; }
+  .btn-primary:hover { background: #29475e; border-color: #29475e; }
+  .dark .btn-primary { background: #d8e3eb; border-color: #d8e3eb; color: #172d40; }
+  .dark .btn-primary:hover { background: #edf2f6; border-color: #edf2f6; }
+  .btn-primary:disabled, .btn-secondary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-secondary { @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded text-sm font-medium transition-colors duration-150; background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--canvas); border-color: #97a8b5; }
+  .input { @apply px-3 py-2 rounded text-sm transition-colors duration-150; background: var(--surface); color: var(--text-primary); border: 1px solid #b5c0c9; }
+  .dark .input { border-color: #465866; }
+  .input::placeholder { color: var(--text-secondary); }
+  .input:focus { outline: 2px solid #5c7b9333; outline-offset: 1px; border-color: #5c7b93; }
+  .badge-green { @apply badge bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800; }
+  .badge-red { @apply badge bg-red-50 text-red-800 dark:bg-red-500/10 dark:text-red-300 border border-red-200 dark:border-red-800; }
+  .badge-blue, .badge-purple { @apply badge bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200 border border-slate-200 dark:border-slate-600; }
+  .badge-orange { @apply badge bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300 border border-amber-200 dark:border-amber-800; }
+  /* Compatibility for existing views: text stays solid throughout the workspace. */
+  .text-gradient { color: var(--text-primary); }
+  .status-dot-green { @apply status-dot bg-emerald-600; }
+  .status-dot-blue { @apply status-dot bg-slate-500; }
+  .status-dot-orange { @apply status-dot bg-amber-600; }
+  /* Native Markdown typography; the project does not load a typography plugin. */
+  .prose { color: var(--text-primary); overflow-wrap: anywhere; }
+  .prose > :first-child { margin-top: 0; }
+  .prose > :last-child { margin-bottom: 0; }
+  .prose p { margin: .7em 0; }
+  .prose h1, .prose h2, .prose h3, .prose h4 { margin: 1.5em 0 .6em; font-weight: 600; line-height: 1.5; color: var(--text-primary); }
+  .prose h1 { font-size: 1.4em; }
+  .prose h2 { font-size: 1.2em; }
+  .prose h3, .prose h4 { font-size: 1.05em; }
+  .prose strong { font-weight: 600; }
+  .prose ul, .prose ol { margin: .75em 0; padding-left: 1.5em; }
+  .prose ul { list-style: disc; }
+  .prose ol { list-style: decimal; }
+  .prose li { margin: .3em 0; }
+  .prose li > p { margin: .25em 0; }
+  .prose blockquote { margin: 1em 0; padding: .25em 1em; border-left: 2px solid var(--brand-detail); color: var(--text-secondary); }
+  .prose a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+  .prose hr { margin: 1.5em 0; border-color: var(--border); }
+  .prose pre { margin: 1em 0; padding: 1em; background: var(--canvas); border-radius: 4px; overflow-x: auto; }
+  .prose code { font-size: .9em; }
+  .prose table { margin: 1em 0; border-collapse: collapse; }
+  .prose th, .prose td { padding: .6em .8em; border-bottom: 1px solid var(--border); text-align: left; }
+}
 
-  /* 卡片样式 - 亮色/暗色适配 */
-  .card {
-    @apply bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl p-4;
-    @apply shadow-sm dark:shadow-lg;
-  }
-
-  .card-hover {
-    @apply transition-all duration-300;
-  }
-
-  .card-hover:hover {
-    @apply border-blue-400 dark:border-blue-500/50;
-    @apply shadow-md dark:shadow-blue-500/10;
-    transform: translateY(-2px);
-  }
-
-  /* 按钮样式 */
-  .btn-primary {
-    @apply px-4 py-2 rounded-lg font-medium text-white transition-all duration-200;
-    @apply bg-gradient-to-r from-blue-500 to-blue-600;
-    @apply hover:from-blue-600 hover:to-blue-700;
-    @apply shadow-md hover:shadow-lg;
-  }
-
-  .btn-primary:disabled {
-    @apply opacity-50 cursor-not-allowed;
-    transform: none;
-  }
-
-  .btn-secondary {
-    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
-    @apply bg-slate-100 text-slate-700 border border-slate-300;
-    @apply dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600;
-    @apply hover:bg-slate-200 dark:hover:bg-slate-600;
-  }
-
-  /* 输入框 */
-  .input {
-    @apply px-3 py-2 rounded-lg transition-all duration-200;
-    @apply bg-white dark:bg-slate-800;
-    @apply text-slate-900 dark:text-slate-100;
-    @apply placeholder:text-slate-400 dark:placeholder:text-slate-500;
-    @apply border border-slate-300 dark:border-slate-600;
-    @apply focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500;
-  }
-
-  /* 标签样式 */
-  .badge-green {
-    @apply badge bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400;
-    @apply border border-green-200 dark:border-green-500/30;
-  }
-
-  .badge-red {
-    @apply badge bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400;
-    @apply border border-red-200 dark:border-red-500/30;
-  }
-
-  .badge-blue {
-    @apply badge bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400;
-    @apply border border-blue-200 dark:border-blue-500/30;
-  }
-
-  .badge-orange {
-    @apply badge bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400;
-    @apply border border-orange-200 dark:border-orange-500/30;
-  }
-
-  .badge-purple {
-    @apply badge bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400;
-    @apply border border-purple-200 dark:border-purple-500/30;
-  }
-
-  /* 渐变文字 */
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-400;
-  }
-
-  /* 状态指示器 */
-  .status-dot-green {
-    @apply status-dot bg-green-500;
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
-  }
-
-  .status-dot-blue {
-    @apply status-dot bg-blue-500;
-    box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
-  }
-
-  .status-dot-orange {
-    @apply status-dot bg-orange-500;
-    box-shadow: 0 0 8px rgba(249, 115, 22, 0.6);
-  }
+@media (min-width: 768px) {
+  .workspace-sidebar { width: var(--sidebar-width, 208px); }
+  .workspace-content { margin-left: var(--sidebar-width, 208px); }
 }
 
 @layer utilities {
-  .animate-in {
-    animation: animateIn 0.3s ease-out;
-  }
+  .dark .text-slate-500 { color: var(--text-secondary); }
+  .animate-in { animation: animateIn .18s ease-out; }
+  @keyframes animateIn { from { opacity: 0; } to { opacity: 1; } }
 
-  @keyframes animateIn {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
+  /* ── 协同工作流专用动效 ────────────────────────────────────── */
+  @keyframes nodePulseGlow {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.45), 0 4px 16px rgba(59, 130, 246, 0.2);
     }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
+    50% {
+      box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.15), 0 8px 24px rgba(59, 130, 246, 0.4);
     }
   }
+  .node-active-glow {
+    animation: nodePulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes radarWave {
+    0%, 100% { transform: scale(1); opacity: 0.7; }
+    50% { transform: scale(1.35); opacity: 0.15; }
+  }
+  .radar-wave {
+    animation: radarWave 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes edgeFlowParticle {
+    from { stroke-dashoffset: 28; }
+    to { stroke-dashoffset: 0; }
+  }
+  .laser-flow {
+    stroke-dasharray: 8 6;
+    animation: edgeFlowParticle 0.85s linear infinite !important;
+  }
+
+  @keyframes debateClashPulse {
+    0%, 100% {
+      stroke: #af423f;
+      filter: drop-shadow(0 0 2px rgba(175, 66, 63, 0.6));
+    }
+    50% {
+      stroke: #287461;
+      filter: drop-shadow(0 0 6px rgba(40, 116, 97, 0.8));
+    }
+  }
+  .debate-clash-edge {
+    animation: debateClashPulse 1.8s ease-in-out infinite, edgeFlowParticle 0.7s linear infinite !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

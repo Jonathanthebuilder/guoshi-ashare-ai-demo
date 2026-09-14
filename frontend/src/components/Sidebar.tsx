@@ -1,71 +1,67 @@
-import { useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
-import { TrendingUp } from 'lucide-react'
-
+import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { navItems } from '@/components/sidebarNav'
 
-const buildDate = __APP_BUILD_DATE__
-const buildCommit = __APP_BUILD_COMMIT__
-const buildVersion = __APP_BUILD_VERSION__
+interface SidebarProps {
+    collapsed: boolean
+    onToggleCollapsed: () => void
+    mobileOpen: boolean
+    onCloseMobile: () => void
+}
 
-export default function Sidebar() {
-    const [isExpanded, setIsExpanded] = useState(false)
-
+export default function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobile }: SidebarProps) {
+    const sidebarRef = useRef<HTMLElement>(null)
+    const showLabels = mobileOpen || !collapsed
+    useEffect(() => {
+        if (!mobileOpen) return
+        const previouslyFocused = document.activeElement as HTMLElement | null
+        const originalOverflow = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+        const elements = () => Array.from(sidebarRef.current?.querySelectorAll<HTMLElement>('a[href], button') || [])
+            .filter((element) => element.offsetParent !== null)
+        elements()[0]?.focus()
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') { event.preventDefault(); onCloseMobile() }
+            if (event.key !== 'Tab') return
+            const items = elements()
+            const first = items[0]
+            const last = items[items.length - 1]
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+        }
+        document.addEventListener('keydown', onKeyDown)
+        return () => {
+            document.body.style.overflow = originalOverflow
+            document.removeEventListener('keydown', onKeyDown)
+            previouslyFocused?.focus()
+        }
+    }, [mobileOpen, onCloseMobile])
     return (
-        <aside
-            className={`fixed left-0 top-0 h-full bg-slate-900/95 backdrop-blur-md border-r border-slate-700 flex flex-col z-50 transition-all duration-300 ${isExpanded ? 'w-48' : 'w-16'
-                }`}
-            onMouseEnter={() => setIsExpanded(true)}
-            onMouseLeave={() => setIsExpanded(false)}
-        >
-            {/* Logo */}
-            <div className="h-16 flex items-center justify-center border-b border-slate-700 px-2">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
-                        <TrendingUp className="w-5 h-5 text-white" />
-                    </div>
-                    {isExpanded && (
-                        <span className="font-bold text-base bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent whitespace-nowrap">
-                            TradingAgents
-                        </span>
-                    )}
-                </div>
-            </div>
-
-            {/* Navigation */}
-            <nav className="flex-1 py-4 px-2 space-y-2">
-                {navItems.map((item) => (
-                    <NavLink
-                        key={item.path}
-                        to={item.path}
-                        className={({ isActive }) =>
-                            `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${isActive
-                                ? 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-blue-400 border border-blue-500/30'
-                                : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
-                            }`
-                        }
-                    >
-                        <item.icon className="w-5 h-5 flex-shrink-0" />
-                        {isExpanded && (
-                            <span className="font-medium text-sm whitespace-nowrap">{item.label}</span>
-                        )}
+        <>
+            {mobileOpen && <div className="fixed inset-0 z-50 bg-slate-950/40 md:hidden" aria-hidden="true" onClick={onCloseMobile} />}
+            <aside id="primary-navigation" ref={sidebarRef} className={`workspace-sidebar fixed inset-y-0 left-0 z-[60] flex-col ${mobileOpen ? 'flex' : 'hidden'} md:flex`} role={mobileOpen ? 'dialog' : undefined} aria-modal={mobileOpen || undefined} aria-label="工作台导航">
+                <div className={`flex h-16 shrink-0 items-center border-b border-white/10 ${showLabels ? 'justify-between px-5' : 'justify-center'}`}>
+                    <NavLink to="/" onClick={onCloseMobile} className="flex items-center gap-2.5" aria-label="老 K 自建 · 投研工作台首页">
+                        {showLabels ? <div><div className="font-serif text-lg font-semibold tracking-[.14em] text-white">老 K 自建</div><div className="mt-0.5 text-[9px] tracking-[.14em] text-slate-300">QUANT & RESEARCH</div></div> : <span className="font-serif text-lg text-[#c0a47c]">K</span>}
                     </NavLink>
-                ))}
-            </nav>
-
-            {/* Footer */}
-            <div className="p-3 border-t border-slate-700">
-                {isExpanded ? (
-                    <div className="text-xs text-slate-500 text-center">
-                        <p className="text-slate-400 text-sm font-medium">TradingAgents</p>
-                        <p className="mt-0.5">多智能体投研系统</p>
-                        <p className="mt-1 font-mono text-[11px] text-slate-400">{buildVersion}</p>
-                        <p className="mt-0.5 text-[10px] text-slate-500">{buildDate} · {buildCommit}</p>
-                    </div>
-                ) : (
-                    <div className="text-[10px] text-slate-500 text-center font-mono">{buildCommit}</div>
-                )}
-            </div>
-        </aside>
+                    <button className="rounded p-1.5 text-slate-300 hover:bg-white/10 md:hidden" onClick={onCloseMobile} aria-label="关闭导航"><X className="h-5 w-5" /></button>
+                </div>
+                <div className={`pt-7 pb-3 text-[10px] tracking-[.12em] text-slate-400 ${showLabels ? 'px-5' : 'px-2 text-center'}`}>{showLabels ? '投研工作台' : '投研'}</div>
+                <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-4" aria-label="主要导航">
+                    {navItems.map((item) => <NavLink key={item.path} to={item.path} end={item.path === '/'} onClick={onCloseMobile} title={showLabels ? undefined : item.label} aria-label={item.label}
+                        className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded border-l-2 text-sm transition-colors duration-150 ${showLabels ? 'px-3' : 'justify-center px-0'} ${isActive ? 'border-[#c0a47c] bg-white/[.09] font-medium text-white' : 'border-transparent text-slate-300 hover:bg-white/[.05] hover:text-white'}`}>
+                        <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.6} />
+                        {showLabels && <span className="whitespace-nowrap">{item.label}</span>}
+                    </NavLink>)}
+                </nav>
+                <div className="hidden border-t border-white/10 p-2 md:block">
+                    <button onClick={onToggleCollapsed} aria-label={collapsed ? '展开导航' : '收起导航'} aria-expanded={!collapsed} className={`flex min-h-10 w-full items-center gap-3 rounded text-xs text-slate-300 hover:bg-white/[.05] hover:text-white ${collapsed ? 'justify-center' : 'px-3'}`}>
+                        {collapsed ? <PanelLeftOpen className="h-[18px] w-[18px]" /> : <PanelLeftClose className="h-[18px] w-[18px]" />}
+                        {!collapsed && <span>收起导航</span>}
+                    </button>
+                </div>
+            </aside>
+        </>
     )
 }

@@ -40,7 +40,7 @@ from pydantic import BaseModel, Field, field_serializer
 from sqlalchemy.orm import Session
 import pandas as pd
 
-from api.database import UserDB, UserLLMConfigDB, VersionStatsDB, ReportDB, ImportedPortfolioPositionDB, FeedbackDB, SponsorDB, init_db, get_db, get_db_ctx
+from api.database import UserDB, UserLLMConfigDB, UserLLMProfileDB, VersionStatsDB, ReportDB, ImportedPortfolioPositionDB, FeedbackDB, SponsorDB, init_db, get_db, get_db_ctx
 from api.job_store import get_job_store as _new_job_store
 from api.services import auth_service, portfolio_import_service, report_service, token_service, watchlist_service, scheduled_service, tracking_board_service, feedback_service, sponsor_service
 
@@ -264,9 +264,9 @@ async def lifespan(app: FastAPI):
     from tradingagents.dataflows.trade_calendar import _load_cn_trade_dates
     _load_cn_trade_dates()
     _log("Trade calendar pre-loaded.")
-    # Pre-load stock + ETF name map
-    await asyncio.to_thread(_load_cn_stock_map)
-    _log("Stock map pre-loaded on startup.")
+    # Pre-load stock + ETF name map asynchronously in background
+    asyncio.create_task(asyncio.to_thread(_load_cn_stock_map))
+    _log("Stock map loading scheduled in background.")
     yield
     _log("Shutting down: Cleaning up resources...")
     _executor.shutdown(wait=True)
@@ -330,7 +330,7 @@ _global_config_overrides: Dict[str, Any] = {}
 _CONFIG_OVERRIDES_ALLOWLIST = {
     "llm_provider", "deep_think_llm", "quick_think_llm",
     "max_debate_rounds", "max_risk_discuss_rounds",
-    "prompt_language",
+    "prompt_language", "profile_id",
 }
 # Hold references to fire-and-forget tasks so they are not garbage collected
 _background_tasks: set = set()
@@ -598,6 +598,7 @@ class UserContextInput(BaseModel):
     max_loss_pct: Optional[float] = Field(None, description="最大容忍亏损百分比")
     constraints: List[str] = Field(default_factory=list, description="用户的硬约束列表")
     user_notes: Optional[str] = Field(None, description="用户补充说明")
+    profile_id: Optional[str] = Field(None, description="指定的模型配置 Profile ID")
 
 
 class AnalyzeRequest(UserContextInput):
@@ -839,6 +840,52 @@ class UserRuntimeConfigResponse(BaseModel):
     email_report_enabled: bool = True
     wecom_report_enabled: bool = True
     default_analysts: List[str] = Field(default_factory=lambda: ["market", "social", "news", "fundamentals", "macro", "smart_money", "volume_price"])
+    active_profile_id: Optional[str] = None
+    active_profile_name: Optional[str] = None
+
+
+class LLMProfileResponse(BaseModel):
+    id: str
+    name: str
+    provider: str
+    backend_url: Optional[str] = None
+    quick_think_llm: Optional[str] = None
+    deep_think_llm: Optional[str] = None
+    has_api_key: bool = False
+    api_key_hint: Optional[str] = None
+    is_default: bool = False
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class LLMProfileCreateRequest(BaseModel):
+    name: str
+    provider: str = "openai"
+    backend_url: Optional[str] = None
+    quick_think_llm: Optional[str] = None
+    deep_think_llm: Optional[str] = None
+    api_key: Optional[str] = None
+    is_default: bool = False
+
+
+class LLMProfileUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    provider: Optional[str] = None
+    backend_url: Optional[str] = None
+    quick_think_llm: Optional[str] = None
+    deep_think_llm: Optional[str] = None
+    api_key: Optional[str] = None
+    clear_api_key: bool = False
+    is_default: Optional[bool] = None
+
+
+class LLMProfileTestRequest(BaseModel):
+    provider: Optional[str] = "openai"
+    backend_url: Optional[str] = None
+    quick_think_llm: Optional[str] = None
+    deep_think_llm: Optional[str] = None
+    api_key: Optional[str] = None
+    profile_id: Optional[str] = None
 
 
 class UserRuntimeConfigUpdateRequest(BaseModel):
@@ -945,29 +992,55 @@ def _deep_merge(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, An
     return base
 
 
-def _user_config_overrides(user_id: Optional[str], db: Optional[Session] = None) -> Dict[str, Any]:
+def _user_config_overrides(
+    user_id: Optional[str],
+    profile_id: Optional[str] = None,
+    db: Optional[Session] = None,
+) -> Dict[str, Any]:
     if not user_id:
         return {}
 
     def _query(sess: Session) -> Dict[str, Any]:
-        user_cfg = auth_service.get_user_llm_config(sess, user_id)
-        if not user_cfg:
-            return {}
         result: Dict[str, Any] = {}
-        for key in (
-            "llm_provider",
-            "backend_url",
-            "quick_think_llm",
-            "deep_think_llm",
-            "max_debate_rounds",
-            "max_risk_discuss_rounds",
-        ):
-            value = getattr(user_cfg, key, None)
-            if value is not None:
-                result[key] = value
-        api_key = auth_service.decrypt_secret(user_cfg.api_key_encrypted)
-        if api_key:
-            result["api_key"] = api_key
+        user_cfg = auth_service.get_user_llm_config(sess, user_id)
+        if user_cfg:
+            for key in (
+                "llm_provider",
+                "backend_url",
+                "quick_think_llm",
+                "deep_think_llm",
+                "max_debate_rounds",
+                "max_risk_discuss_rounds",
+            ):
+                value = getattr(user_cfg, key, None)
+                if value is not None:
+                    result[key] = value
+            api_key = auth_service.decrypt_secret(user_cfg.api_key_encrypted)
+            if api_key:
+                result["api_key"] = api_key
+
+        # Check for profile
+        profile = None
+        if profile_id:
+            profile = auth_service.get_user_llm_profile(sess, user_id, profile_id)
+        if not profile:
+            profile = auth_service.get_default_user_llm_profile(sess, user_id)
+
+        if profile:
+            result["profile_id"] = profile.id
+            result["profile_name"] = profile.name
+            if profile.provider:
+                result["llm_provider"] = profile.provider
+            if profile.backend_url is not None:
+                result["backend_url"] = profile.backend_url
+            if profile.quick_think_llm is not None:
+                result["quick_think_llm"] = profile.quick_think_llm
+            if profile.deep_think_llm is not None:
+                result["deep_think_llm"] = profile.deep_think_llm
+            prof_key = auth_service.decrypt_secret(profile.api_key_encrypted)
+            if prof_key:
+                result["api_key"] = prof_key
+
         return result
 
     if db is not None:
@@ -976,10 +1049,17 @@ def _user_config_overrides(user_id: Optional[str], db: Optional[Session] = None)
         return _query(own_db)
 
 
-def _build_runtime_config(overrides: Dict[str, Any], user_id: Optional[str] = None, db: Optional[Session] = None) -> Dict[str, Any]:
+def _build_runtime_config(
+    overrides: Dict[str, Any],
+    user_id: Optional[str] = None,
+    profile_id: Optional[str] = None,
+    db: Optional[Session] = None,
+) -> Dict[str, Any]:
     config = deepcopy(DEFAULT_CONFIG)
     server_fallback_enabled = os.getenv("ALLOW_SERVER_LLM_FALLBACK", "1").strip().lower() in ("1", "true", "yes", "on")
     config["server_fallback_enabled"] = server_fallback_enabled
+
+    req_profile_id = profile_id or (overrides.get("profile_id") if isinstance(overrides, dict) else None)
 
     # Security: filter request overrides to allowlist only
     overrides = {k: v for k, v in overrides.items() if k in _CONFIG_OVERRIDES_ALLOWLIST}
@@ -989,7 +1069,7 @@ def _build_runtime_config(overrides: Dict[str, Any], user_id: Optional[str] = No
         config = _deep_merge(config, dict(_global_config_overrides))
     
     # Fetch user specific overrides from DB (pass db to reuse caller's session)
-    user_overrides = _user_config_overrides(user_id, db=db)
+    user_overrides = _user_config_overrides(user_id, profile_id=req_profile_id, db=db)
 
     # ── Critical: Filter out empty strings before merging ──
     # This prevents an empty DB field from wiping out an Env Var default.
@@ -1724,7 +1804,11 @@ async def _run_job_inner(
                 db.commit()
             except Exception as e:
                 _log(f"CRITICAL: Failed to initialize report in DB: {e}")
-        return _build_runtime_config(request.config_overrides, user_id=user_id)
+        return _build_runtime_config(
+            request.config_overrides,
+            user_id=user_id,
+            profile_id=getattr(request, "profile_id", None),
+        )
 
     config = await asyncio.to_thread(_init_and_configure)
 
@@ -1743,7 +1827,11 @@ async def _run_job_inner(
             "job_id": job_id,
             "symbol": normalized_symbol,
             "display_name": display_name,
-            "trade_date": request.trade_date
+            "trade_date": request.trade_date,
+            "profile_id": config.get("profile_id"),
+            "profile_name": config.get("profile_name"),
+            "model_name": config.get("deep_think_llm") or config.get("quick_think_llm"),
+            "llm_provider": config.get("llm_provider"),
         },
     )
     # Ensure request object uses the normalized symbol for internal logic
@@ -2040,6 +2128,10 @@ async def _run_job_inner(
                 "confidence": resolved["confidence"],
                 "target_price": resolved["target_price"],
                 "stop_loss_price": resolved["stop_loss_price"],
+                "profile_id": config.get("profile_id"),
+                "profile_name": config.get("profile_name"),
+                "model_name": config.get("deep_think_llm") or config.get("quick_think_llm"),
+                "llm_provider": config.get("llm_provider"),
             })
 
             # 自动保存报告到数据库
@@ -2079,6 +2171,10 @@ async def _run_job_inner(
                 "confidence": result["confidence"],
                 "target_price": result["target_price"],
                 "stop_loss_price": result["stop_loss_price"],
+                "profile_id": config.get("profile_id"),
+                "profile_name": config.get("profile_name"),
+                "model_name": config.get("deep_think_llm") or config.get("quick_think_llm"),
+                "llm_provider": config.get("llm_provider"),
             })
             _log(f"Job completed successfully: {job_id}")
             _log(f"[Timer] TOTAL Job execution (dual_horizon) took {time.time() - job_start_t:.2f}s")
@@ -2277,6 +2373,10 @@ async def _run_job_inner(
             "confidence": resolved["confidence"],
             "target_price": resolved["target_price"],
             "stop_loss_price": resolved["stop_loss_price"],
+            "profile_id": config.get("profile_id"),
+            "profile_name": config.get("profile_name"),
+            "model_name": config.get("deep_think_llm") or config.get("quick_think_llm"),
+            "llm_provider": config.get("llm_provider"),
         })
 
         # 自动保存/收口报告到数据库
@@ -2325,6 +2425,10 @@ async def _run_job_inner(
                 "confidence": result["confidence"],
                 "target_price": result["target_price"],
                 "stop_loss_price": result["stop_loss_price"],
+                "profile_id": config.get("profile_id"),
+                "profile_name": config.get("profile_name"),
+                "model_name": config.get("deep_think_llm") or config.get("quick_think_llm"),
+                "llm_provider": config.get("llm_provider"),
             },
         )
         _log(f"Job completed successfully: {job_id}")
@@ -3196,7 +3300,12 @@ async def chat_completions(
     current_user: UserDB = Depends(_require_api_user),
 ):
     text = _extract_chat_text(request.messages)
-    config = await asyncio.to_thread(_build_runtime_config, request.config_overrides, user_id=current_user.id)
+    config = await asyncio.to_thread(
+        _build_runtime_config,
+        request.config_overrides,
+        user_id=current_user.id,
+        profile_id=request.profile_id,
+    )
 
     # ── 流式模式：立刻返回 SSE 流，在后台异步提取意图再启动任务 ──────────────────
     # 这样用户提交查询后立刻收到 job.ready，不用等待 thinking 模型的 StockExtract。
@@ -3240,6 +3349,7 @@ async def chat_completions(
                     trade_date=trade_date or cn_today_str(),
                     selected_analysts=request.selected_analysts,
                     config_overrides=request.config_overrides,
+                    profile_id=request.profile_id,
                     dry_run=request.dry_run,
                     query=text,
                     horizons=horizons,
@@ -3320,6 +3430,7 @@ async def chat_completions(
         trade_date=trade_date or cn_today_str(),
         selected_analysts=request.selected_analysts,
         config_overrides=request.config_overrides,
+        profile_id=request.profile_id,
         dry_run=request.dry_run,
         query=text,
         horizons=horizons,
@@ -3757,6 +3868,11 @@ def _probe_runtime_config(config: Dict[str, Any]) -> Dict[str, str]:
                 status_code=400,
                 detail="模型 Key 验证失败：上游返回 401 Invalid Authentication，请检查 API Key 是否正确。",
             ) from exc
+        if "400" in lowered or "bad request" in lowered or "model" in lowered:
+            raise HTTPException(
+                status_code=400,
+                detail=f"模型请求失败 (400 Bad Request)：{detail[:250]}。请检查模型名称是否准确（官方模型通常为全小写，如 deepseek-flash、deepseek-v4-pro）。",
+            ) from exc
         raise HTTPException(
             status_code=400,
             detail=f"模型连接验证失败：{detail[:200] or 'unknown error'}",
@@ -3862,6 +3978,8 @@ def _config_response_for_user(user: Optional[UserDB], db: Session) -> UserRuntim
         email_report_enabled=user.email_report_enabled if user and hasattr(user, 'email_report_enabled') else True,
         wecom_report_enabled=user.wecom_report_enabled if user and hasattr(user, "wecom_report_enabled") else True,
         default_analysts=json.loads(user_cfg.default_analysts) if user_cfg and user_cfg.default_analysts else ["market", "social", "news", "fundamentals", "macro", "smart_money", "volume_price"],
+        active_profile_id=cfg.get("profile_id"),
+        active_profile_name=cfg.get("profile_name"),
     )
 
 
@@ -3887,6 +4005,41 @@ def verify_login_code(body: AuthVerifyCodeRequest, request: Request, db: Session
         raise HTTPException(status_code=400, detail="验证码错误或已过期")
     access_token = auth_service.create_access_token(user)
     return AuthVerifyCodeResponse(access_token=access_token, user=user)
+
+
+class DemoLoginRequest(BaseModel):
+    nickname: Optional[str] = None
+
+
+@app.post("/v1/auth/demo-login", response_model=AuthVerifyCodeResponse)
+def demo_login(
+    body: Optional[DemoLoginRequest] = None,
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    """现场演示 · 观众免密一键 Demo 体验登录通道"""
+    client_ip = _get_real_ip(request) if request else None
+    user = auth_service.create_demo_user(db, nickname=body.nickname if body else None, client_ip=client_ip)
+    # 自动预载/继承主模板大模型配置与 API Key，使观众立即可运行真实分析
+    auth_service.list_user_llm_profiles(db, user.id)
+    access_token = auth_service.create_access_token(user, expires_days=7)
+    return AuthVerifyCodeResponse(access_token=access_token, user=user)
+
+
+@app.post("/v1/auth/master-login", response_model=AuthVerifyCodeResponse)
+def master_login(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """老 K 主账号免密直达通道（演示主持人一键免输验证码登录）"""
+    admin_user = auth_service.get_user_by_email(db, "1@23.com")
+    if not admin_user:
+        admin_user = auth_service.verify_login_code(db, "1@23.com", "000000", client_ip=_get_real_ip(request))
+    if not admin_user:
+        raise HTTPException(status_code=404, detail="主账号未就绪")
+    access_token = auth_service.create_access_token(admin_user, expires_days=30)
+    return AuthVerifyCodeResponse(access_token=access_token, user=admin_user)
+
 
 
 @app.get("/v1/auth/me", response_model=UserResponse)
@@ -4050,6 +4203,163 @@ async def warmup_wecom_webhook(
         "sent": True,
         "message": "Webhook 测试发送成功",
         "webhook_display": _mask_wecom_webhook(webhook_url),
+    }
+
+
+# ── LLM Profiles Management ──────────────────────────────────────────────────
+
+def _mask_api_key(encrypted_key: Optional[str]) -> tuple[bool, Optional[str]]:
+    if not encrypted_key:
+        return False, None
+    raw = auth_service.decrypt_secret(encrypted_key)
+    if not raw:
+        return True, "••••••••"
+    if len(raw) <= 8:
+        return True, "••••" + raw[-2:]
+    return True, f"{raw[:3]}••••{raw[-4:]}"
+
+
+def _profile_to_response(profile: UserLLMProfileDB) -> LLMProfileResponse:
+    has_key, hint = _mask_api_key(profile.api_key_encrypted)
+    return LLMProfileResponse(
+        id=profile.id,
+        name=profile.name,
+        provider=profile.provider,
+        backend_url=profile.backend_url,
+        quick_think_llm=profile.quick_think_llm,
+        deep_think_llm=profile.deep_think_llm,
+        has_api_key=has_key,
+        api_key_hint=hint,
+        is_default=profile.is_default,
+        created_at=profile.created_at,
+        updated_at=profile.updated_at,
+    )
+
+
+@app.get("/v1/llm-profiles", response_model=List[LLMProfileResponse])
+def get_user_llm_profiles(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(_require_web_user),
+):
+    """获取用户配置的所有大模型接入点列表。"""
+    profiles = auth_service.list_user_llm_profiles(db, current_user.id)
+    return [_profile_to_response(p) for p in profiles]
+
+
+@app.post("/v1/llm-profiles", response_model=LLMProfileResponse)
+def create_user_llm_profile(
+    body: LLMProfileCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(_require_web_user),
+):
+    """新增大模型接入点配置。"""
+    profile = auth_service.create_user_llm_profile(
+        db,
+        current_user.id,
+        name=body.name,
+        provider=body.provider,
+        backend_url=body.backend_url,
+        quick_think_llm=body.quick_think_llm,
+        deep_think_llm=body.deep_think_llm,
+        api_key=body.api_key,
+        is_default=body.is_default,
+    )
+    return _profile_to_response(profile)
+
+
+@app.put("/v1/llm-profiles/{profile_id}", response_model=LLMProfileResponse)
+def update_user_llm_profile(
+    profile_id: str,
+    body: LLMProfileUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(_require_web_user),
+):
+    """修改大模型接入点配置。"""
+    profile = auth_service.update_user_llm_profile(
+        db,
+        current_user.id,
+        profile_id,
+        name=body.name,
+        provider=body.provider,
+        backend_url=body.backend_url,
+        quick_think_llm=body.quick_think_llm,
+        deep_think_llm=body.deep_think_llm,
+        api_key=body.api_key,
+        clear_api_key=body.clear_api_key,
+        is_default=body.is_default,
+    )
+    if not profile:
+        raise HTTPException(status_code=404, detail="模型配置不存在")
+    return _profile_to_response(profile)
+
+
+@app.delete("/v1/llm-profiles/{profile_id}")
+def delete_user_llm_profile(
+    profile_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(_require_web_user),
+):
+    """删除指定大模型配置。"""
+    success = auth_service.delete_user_llm_profile(db, current_user.id, profile_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="模型配置不存在")
+    return {"status": "ok", "message": "模型配置已删除"}
+
+
+@app.post("/v1/llm-profiles/{profile_id}/default", response_model=LLMProfileResponse)
+def set_default_user_llm_profile(
+    profile_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(_require_web_user),
+):
+    """设为默认模型接入点。"""
+    profile = auth_service.set_default_user_llm_profile(db, current_user.id, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="模型配置不存在")
+    return _profile_to_response(profile)
+
+
+@app.post("/v1/llm-profiles/test")
+def test_user_llm_profile(
+    body: LLMProfileTestRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(_require_web_user),
+):
+    """测试模型连通性与可用性。"""
+    api_key = body.api_key
+    backend_url = body.backend_url
+    provider = body.provider or "openai"
+    quick_think_llm = body.quick_think_llm
+    deep_think_llm = body.deep_think_llm
+
+    if body.profile_id and not api_key:
+        prof = auth_service.get_user_llm_profile(db, current_user.id, body.profile_id)
+        if prof:
+            api_key = auth_service.decrypt_secret(prof.api_key_encrypted)
+            if not backend_url:
+                backend_url = prof.backend_url
+            if not provider:
+                provider = prof.provider
+            if not quick_think_llm:
+                quick_think_llm = prof.quick_think_llm
+            if not deep_think_llm:
+                deep_think_llm = prof.deep_think_llm
+
+    if not api_key:
+        raise HTTPException(status_code=400, detail="请填写 API Key 后再进行连接测试")
+
+    cfg = {
+        "llm_provider": provider,
+        "backend_url": backend_url,
+        "quick_think_llm": quick_think_llm,
+        "deep_think_llm": deep_think_llm,
+        "api_key": api_key,
+    }
+    probe = _probe_runtime_config(cfg)
+    return {
+        "status": "ok",
+        "message": f"连接成功！模型响应正常 ({probe.get('model')})",
+        "probe": probe,
     }
 
 
