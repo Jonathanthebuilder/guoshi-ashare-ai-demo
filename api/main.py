@@ -3547,10 +3547,17 @@ def list_reports(
     current_user: UserDB = Depends(_require_api_user),
 ):
     """获取报告列表."""
-    total = report_service.count_reports(db=db, user_id=current_user.id, symbol=symbol)
+    target_user_id = current_user.id
+    total = report_service.count_reports(db=db, user_id=target_user_id, symbol=symbol)
+    if total == 0 and getattr(current_user, "email", "").startswith("demo_"):
+        sample_total = report_service.count_reports(db=db, user_id=None, symbol=symbol)
+        if sample_total > 0:
+            target_user_id = None
+            total = sample_total
+
     reports = report_service.get_reports_by_user(
         db=db,
-        user_id=current_user.id,
+        user_id=target_user_id,
         symbol=symbol,
         skip=skip,
         limit=limit,
@@ -3568,11 +3575,18 @@ def list_latest_reports_by_symbols(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(_require_api_user),
 ):
+    target_user_id = current_user.id
     reports = report_service.get_latest_reports_by_symbols(
         db=db,
-        user_id=current_user.id,
+        user_id=target_user_id,
         symbols=body.symbols,
     )
+    if not reports and getattr(current_user, "email", "").startswith("demo_"):
+        reports = report_service.get_latest_reports_by_symbols(
+            db=db,
+            user_id=None,
+            symbols=body.symbols,
+        )
     return {"reports": reports}
 
 
@@ -3584,6 +3598,8 @@ def get_report_endpoint(
 ):
     """获取报告详情."""
     report = report_service.get_report(db, report_id, user_id=current_user.id)
+    if not report and getattr(current_user, "email", "").startswith("demo_"):
+        report = report_service.get_report(db, report_id, user_id=None)
     if not report:
         raise HTTPException(status_code=404, detail="报告不存在")
     if str(report.status or "") in report_service.ACTIVE_REPORT_STATUSES and not _get_job(report_id):
