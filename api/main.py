@@ -5078,8 +5078,10 @@ if os.path.exists(dist_path):
 
 
 def run() -> None:
+    import os
     import uvicorn
     from pathlib import Path
 
+    port = int(os.getenv("PORT", "8000"))
     log_config = str(Path(__file__).parent / "logging_config.yaml")
-    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=False, log_config=log_config)
+    uvicorn.run("api.main:app", host="0.0.0.0", port=port, reload=False, log_config=log_config)
